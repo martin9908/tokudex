@@ -1,0 +1,64 @@
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: var(--font-body), sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading), sans-serif;
+    color: var(--text-primary);
+  }
+}
+
+@layer components {
+  .tdx-card {
+    background: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--surface-elevated) 80%, white 20%);
+    border-radius: var(--radius-lg);
+    padding: var(--space-2);
+  }
+
+  .tdx-card-elevated {
+    background: var(--surface-elevated);
+    border-radius: var(--radius-xl);
+  }
+
+  .tdx-btn {
+    min-height: var(--button-height);
+    min-width: var(--touch-target-min);
+    border-radius: var(--radius-md);
+    padding-inline: var(--space-2);
+    font-weight: 600;
+    transition: background-color var(--duration-fast) var(--easing-standard),
+      color var(--duration-fast) var(--easing-standard),
+      opacity var(--duration-fast) var(--easing-standard),
+      transform var(--duration-fast) var(--easing-standard);
+  }
+
+  .tdx-btn-primary {
+    background: var(--accent-primary);
+    color: #00121b;
+  }
+
+  .tdx-btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--surface-elevated);
+  }
+
+  .tdx-btn-danger {
+    background: var(--error);
+    color: #200507;
+  }
+
+  .tdx-focus-ring:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+  }
+}
