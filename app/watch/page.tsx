@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 
 type Series = {
     id: string;
@@ -16,7 +16,7 @@ type Episode = {
     synopsis: string | null;
 };
 
-export default function WatchPage() {
+function WatchPageContent() {
     const searchParams = useSearchParams();
     const seriesId = searchParams.get("series");
     const episodeParam = searchParams.get("episode");
@@ -197,5 +197,19 @@ export default function WatchPage() {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function WatchPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="max-w-3xl mx-auto px-4 py-8 w-full">
+                    <p className="text-cyan-200/70">Loading episode...</p>
+                </div>
+            }
+        >
+            <WatchPageContent />
+        </Suspense>
     );
 }

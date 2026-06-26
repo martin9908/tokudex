@@ -29,6 +29,9 @@ export default async function Home() {
     data: { user },
   } = await client.auth.getUser();
 
+  const fullName = (user?.user_metadata?.full_name as string | undefined)?.trim();
+  const displayName = fullName || user?.email?.split("@")[0] || "there";
+
   let watchItems: WatchItem[] = [];
   const stats = {
     watching: 0,
@@ -89,15 +92,12 @@ export default async function Home() {
   const recentlyUpdated = watchItems.slice(0, 5);
   const primaryItem = watchItems[0];
 
-  const upcoming = featured.map((item, index) => ({
-    ...item,
-    nextEpisode: Math.min(
-      (item.progress.current_episode || 0) + 1,
-      item.series.total_episodes || 1
-    ),
-    dateLabel: index === 0 ? "Today" : index === 1 ? "Tomorrow" : "May 16",
-    timeLabel: "9:00 AM",
-  }));
+  const upcoming = featured
+    .map((item) => ({
+      ...item,
+      nextEpisode: (item.progress.current_episode || 0) + 1,
+    }))
+    .filter((item) => item.nextEpisode <= (item.series.total_episodes || 0));
 
   return (
     <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10">
@@ -131,9 +131,9 @@ export default async function Home() {
               <div className="h-10 w-10 rounded-full border border-cyan-700/40 bg-[#08192a] flex items-center justify-center">
                 <Image src={tokudexIcon} alt="Profile" className="w-5 h-5" />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-cyan-100">Shin K.</p>
-                <p className="text-xs text-cyan-200/60">View Profile</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-cyan-100">{displayName}</p>
+                <p className="truncate text-xs text-cyan-200/60">{user?.email ?? "View Profile"}</p>
               </div>
             </div>
             <div className="rounded-xl border border-cyan-900/50 bg-[#061626]/80 p-4 text-cyan-100/90">
@@ -152,7 +152,7 @@ export default async function Home() {
           <section className="rounded-2xl border border-cyan-900/45 bg-[#061321]/75 backdrop-blur-xl p-4 md:p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Welcome back, Shin!</h1>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Welcome back, {displayName}!</h1>
                 <p className="text-cyan-200/70 mt-1">Update your progress and continue your guide.</p>
               </div>
               <div className="hidden md:block w-64">
@@ -301,31 +301,40 @@ export default async function Home() {
           </section>
 
           <section className="rounded-2xl border border-cyan-900/45 bg-[#061321]/75 backdrop-blur-xl p-4 md:p-5">
-            <h2 className="text-2xl font-semibold mb-3">Upcoming Episodes</h2>
-            <ul className="space-y-3">
-              {upcoming.map(({ series, nextEpisode, dateLabel, timeLabel }) => (
-                <li key={series.id} className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/70 p-2.5 flex items-center gap-3">
-                  <div className="h-14 w-14 rounded-lg border border-cyan-900/50 bg-[#091a2b] flex items-center justify-center shrink-0">
-                    {series.cover_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={series.cover_image_url}
-                        alt={series.title}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Image src={tokudexIcon} alt={series.title} className="w-8 h-8" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{series.title}</p>
-                    <p className="text-xs text-cyan-200/75">Episode {nextEpisode}</p>
-                    <p className="text-xs text-cyan-300/60">{dateLabel} · {timeLabel}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <Link href="/series" className="inline-flex mt-4 text-sm text-cyan-300 hover:text-cyan-200">View Calendar</Link>
+            <h2 className="text-2xl font-semibold mb-3">Up Next</h2>
+            {upcoming.length > 0 ? (
+              <ul className="space-y-3">
+                {upcoming.map(({ series, nextEpisode }) => (
+                  <li key={series.id} className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/70 p-2.5 flex items-center gap-3">
+                    <div className="h-14 w-14 rounded-lg border border-cyan-900/50 bg-[#091a2b] flex items-center justify-center shrink-0 overflow-hidden">
+                      {series.cover_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={series.cover_image_url}
+                          alt={series.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Image src={tokudexIcon} alt={series.title} className="w-8 h-8" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{series.title}</p>
+                      <p className="text-xs text-cyan-200/75">Episode {nextEpisode}</p>
+                      <Link
+                        href={`/watch?series=${series.id}&episode=${nextEpisode}`}
+                        className="text-xs text-cyan-300/80 hover:text-cyan-200"
+                      >
+                        Log episode →
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-cyan-100/70">You&apos;re all caught up on your tracked series.</p>
+            )}
+            <Link href="/series" className="inline-flex mt-4 text-sm text-cyan-300 hover:text-cyan-200">Browse Series</Link>
           </section>
         </aside>
       </div>

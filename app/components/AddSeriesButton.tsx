@@ -1,17 +1,41 @@
 "use client";
 
-export default function AddSeriesButton() {
+import { useState, useTransition } from "react";
+import { addSeriesToTracker } from "../actions";
+
+type AddSeriesButtonProps = {
+    seriesId: string;
+    className?: string;
+};
+
+export default function AddSeriesButton({ seriesId, className = "" }: AddSeriesButtonProps) {
+    const [added, setAdded] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
     function handleClick() {
-        // TODO: open add-series modal or navigate to an add-series form
-        alert("Add series — coming soon");
+        setError(null);
+        startTransition(async () => {
+            try {
+                await addSeriesToTracker(seriesId);
+                setAdded(true);
+            } catch {
+                setError("Could not add series. Please try again.");
+            }
+        });
     }
 
     return (
-        <button
-            onClick={handleClick}
-            className="rounded-lg bg-zinc-900 dark:bg-zinc-50 text-zinc-50 dark:text-zinc-900 px-3 py-1.5 text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-            + Add Series
-        </button>
+        <div>
+            <button
+                type="button"
+                onClick={handleClick}
+                disabled={pending || added}
+                className={`inline-flex w-full justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${className}`}
+            >
+                {added ? "Added to Tracker" : pending ? "Adding…" : "+ Add to My Tracker"}
+            </button>
+            {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+        </div>
     );
 }

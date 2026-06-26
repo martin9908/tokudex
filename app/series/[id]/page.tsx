@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import EpisodeList from "../../components/EpisodeList";
+import AddSeriesButton from "../../components/AddSeriesButton";
 import tokudexIcon from "../../../assets/tokudex_icon.png";
 
 type SeriesDetailPageProps = {
@@ -66,10 +68,12 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
         .eq("series_id", id)
         .single();
 
-    const currentEpisode = progress?.current_episode || 1;
+    const isTracking = !!progress;
+    const currentEpisode = progress?.current_episode || 0;
     const progressPercent = Math.round(
         (currentEpisode / (series.total_episodes || 1)) * 100
     );
+    const nextEpisode = Math.min(currentEpisode + 1, series.total_episodes || 1);
 
     const franchiseMeta: Record<string, string> = {
         "Kamen Rider": "2000-2001",
@@ -137,21 +141,30 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                     </div>
 
                     <div className="rounded-2xl border max-w-2xs border-cyan-900/45 bg-[#07182a]/75 p-4 md:p-5">
-                        <p className="text-cyan-100 text-xl font-semibold mb-3">Next Episode</p>
-                        <div className="space-y-3 gap-15 flex flex-col">
-                            <p className="text-cyan-300 text-sm font-semibold">
-                                Episode {Math.min(currentEpisode + 1, series.total_episodes || 1)}
-                            </p>
-                            <Link
-                                href={`/watch?series=${series.id}&episode=${Math.min(
-                                    currentEpisode + 1,
-                                    series.total_episodes || 1
-                                )}`}
-                                className="inline-flex w-full justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-4 py-2.5 text-sm font-semibold transition-colors"
-                            >
-                                Log Episode {Math.min(currentEpisode + 1, series.total_episodes || 1)}
-                            </Link>
-                        </div>
+                        {isTracking ? (
+                            <>
+                                <p className="text-cyan-100 text-xl font-semibold mb-3">Next Episode</p>
+                                <div className="space-y-3 gap-15 flex flex-col">
+                                    <p className="text-cyan-300 text-sm font-semibold">
+                                        Episode {nextEpisode}
+                                    </p>
+                                    <Link
+                                        href={`/watch?series=${series.id}&episode=${nextEpisode}`}
+                                        className="inline-flex w-full justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-4 py-2.5 text-sm font-semibold transition-colors"
+                                    >
+                                        Log Episode {nextEpisode}
+                                    </Link>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-cyan-100 text-xl font-semibold mb-1">Not Tracking Yet</p>
+                                <p className="text-xs text-cyan-200/65 mb-3">
+                                    Add this series to your tracker, or tap an episode below to start logging.
+                                </p>
+                                <AddSeriesButton seriesId={series.id} />
+                            </>
+                        )}
                     </div>
                 </div>
             </section>
@@ -159,49 +172,14 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
             <section className="rounded-2xl border border-cyan-900/45 bg-[#061321]/75 backdrop-blur-xl p-4 md:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <h2 className="text-2xl font-semibold">Episode List</h2>
-                    <p className="text-sm text-cyan-200/65">Manage progress</p>
+                    <p className="text-sm text-cyan-200/65">Tap an episode to update progress</p>
                 </div>
-                <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {Array.from({ length: series.total_episodes || 0 }, (_, index) => {
-                        const episodeNumber = index + 1;
-                        const isWatched = episodeNumber < currentEpisode;
-                        const isCurrent = episodeNumber === currentEpisode;
-                        const episodeData = episodes.find(
-                            (entry) => entry.episode_number === episodeNumber
-                        );
-
-                        return (
-                            <li
-                                key={episodeNumber}
-                                className={`rounded-xl border p-3 ${isCurrent
-                                    ? "border-cyan-500/60 bg-cyan-500/10"
-                                    : "border-cyan-900/45 bg-[#081a2b]/70"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="text-sm font-semibold text-cyan-100/95">
-                                        {isWatched && "✓ "}
-                                        {isCurrent && "▶ "}
-                                        Episode {episodeNumber}
-                                    </span>
-                                    {isCurrent && (
-                                        <span className="text-xs text-cyan-200/80">
-                                            Current
-                                        </span>
-                                    )}
-                                    {isWatched && !isCurrent && (
-                                        <span className="text-xs text-emerald-300">Watched</span>
-                                    )}
-                                </div>
-                                {episodeData && (
-                                    <p className="text-xs text-cyan-100/65 mt-1 line-clamp-2">
-                                        {episodeData.title}
-                                    </p>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
+                <EpisodeList
+                    seriesId={series.id}
+                    totalEpisodes={series.total_episodes || 0}
+                    currentEpisode={currentEpisode}
+                    episodes={episodes ?? []}
+                />
             </section>
         </div>
     );
