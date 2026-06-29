@@ -1,5 +1,4 @@
 import { createClient as createServerClient } from "./server";
-import { createClient as createBrowserClient } from "./client";
 
 /**
  * Series queries
@@ -139,63 +138,6 @@ export async function upsertEpisodeNote(
     note: string
 ) {
     const client = await createServerClient();
-    const { data, error } = await client
-        .from("episode_notes")
-        .upsert(
-            {
-                user_id: userId,
-                series_id: seriesId,
-                episode_number: episodeNumber,
-                note: note,
-                created_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,series_id,episode_number" }
-        )
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
-}
-
-/**
- * Browser-side mutations (for client components that need immediate feedback)
- */
-
-export async function browserUpsertUserProgress(
-    userId: string,
-    seriesId: string,
-    currentEpisode: number,
-    status: "watching" | "completed" | "on_hold" | "plan_to_watch"
-) {
-    const client = createBrowserClient();
-    const { data, error } = await client
-        .from("user_series_progress")
-        .upsert(
-            {
-                user_id: userId,
-                series_id: seriesId,
-                current_episode: currentEpisode,
-                status: status,
-                last_watched_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,series_id" }
-        )
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
-}
-
-export async function browserUpsertEpisodeNote(
-    userId: string,
-    seriesId: string,
-    episodeNumber: number,
-    note: string
-) {
-    const client = createBrowserClient();
     const { data, error } = await client
         .from("episode_notes")
         .upsert(

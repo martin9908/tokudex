@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { validateNoteInput } from "@/lib/validation";
 
 /**
  * POST /api/notes - Create or update episode note
@@ -17,19 +18,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const {
-            seriesId,
-            episodeNumber,
-            note,
-        }: {
-            seriesId: string;
-            episodeNumber: number;
-            note: string;
-        } = await request.json();
-
-        if (!seriesId || episodeNumber === undefined || !note) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        const validation = validateNoteInput(await request.json());
+        if (!validation.ok) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
         }
+        const { seriesId, episodeNumber, note } = validation.value;
 
         const { data, error } = await client
             .from("episode_notes")

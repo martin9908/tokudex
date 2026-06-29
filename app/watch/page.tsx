@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
+import { saveEpisodeCheckIn } from "../actions";
+import { NOTE_MAX_LENGTH } from "@/lib/validation";
 
 type Series = {
     id: string;
@@ -17,6 +19,7 @@ type Episode = {
 };
 
 function WatchPageContent() {
+    const router = useRouter();
     const searchParams = useSearchParams();
     const seriesId = searchParams.get("series");
     const episodeParam = searchParams.get("episode");
@@ -64,45 +67,19 @@ function WatchPageContent() {
     }, [seriesId, episodeNumber]);
 
     async function handleSave() {
-        if (!seriesId) return;
+        if (!seriesId || saving) return;
 
         try {
             setSaving(true);
             setError(null);
 
-            // Save progress
-            const progressRes = await fetch("/api/progress", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    seriesId,
-                    currentEpisode: episodeNumber,
-                    status,
-                }),
-            });
+            // Single atomic-ish server round-trip: progress + optional note.
+            await saveEpisodeCheckIn(seriesId, episodeNumber, status, note);
 
-            if (!progressRes.ok) throw new Error("Failed to save progress");
-
-            // Save note if provided
-            if (note.trim()) {
-                const noteRes = await fetch("/api/notes", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        seriesId,
-                        episodeNumber,
-                        note,
-                    }),
-                });
-
-                if (!noteRes.ok) throw new Error("Failed to save note");
-            }
-
-            // Redirect to series detail
-            window.location.href = `/series/${seriesId}`;
+            router.push(`/series/${seriesId}`);
+            router.refresh();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to save");
-        } finally {
             setSaving(false);
         }
     }
@@ -128,7 +105,7 @@ function WatchPageContent() {
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-10 w-full space-y-4">
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#061321]/75 p-5">
+            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-5">
                 <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/70 mb-2">
                     Episode Check-in
                 </p>
@@ -145,53 +122,72 @@ function WatchPageContent() {
                 </section>
             )}
 
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#061321]/75 p-5 space-y-4">
+            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-5 space-y-4">
                 <div>
-                    <label className="text-sm font-medium text-cyan-100/90 block mb-2">
+                    <label htmlFor="recap-note" className="text-sm font-medium text-cyan-100/90 block mb-2">
                         Quick recap note
                     </label>
                     <textarea
+                        id="recap-note"
                         rows={4}
                         value={note}
+                        maxLength={NOTE_MAX_LENGTH}
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="What happened in this episode?"
                         className="w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60"
                     />
+                    <p className="mt-1 text-right text-xs text-cyan-200/75">
+                        {note.length}/{NOTE_MAX_LENGTH}
+                    </p>
                 </div>
                 <div>
-                    <label className="text-sm font-medium text-cyan-100/90 block mb-2">Status</label>
-                    <select
-                        value={status}
-                        onChange={(e) =>
-                            setStatus(
-                                e.target.value as
-                                | "watching"
-                                | "completed"
-                                | "on_hold"
-                                | "plan_to_watch"
-                            )
-                        }
-                        className="w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 text-sm text-cyan-50 outline-none focus:ring-2 focus:ring-cyan-500/60"
-                    >
-                        <option value="watching">Watching</option>
-                        <option value="completed">Completed</option>
-                        <option value="on_hold">On Hold</option>
-                        <option value="plan_to_watch">Plan to Watch</option>
-                    </select>
+                    <label htmlFor="status" className="text-sm font-medium text-cyan-100/90 block mb-2">Status</label>
+                    <div className="relative">
+                        <select
+                            id="status"
+                            value={status}
+                            onChange={(e) =>
+                                setStatus(
+                                    e.target.value as
+                                    | "watching"
+                                    | "completed"
+                                    | "on_hold"
+                                    | "plan_to_watch"
+                                )
+                            }
+                            className="w-full appearance-none rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 pr-10 text-sm text-cyan-50 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                        >
+                            <option value="watching">Watching</option>
+                            <option value="completed">Completed</option>
+                            <option value="on_hold">On Hold</option>
+                            <option value="plan_to_watch">Plan to Watch</option>
+                        </select>
+                        <svg
+                            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-300"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden
+                        >
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </div>
                 </div>
             </section>
 
             <div className="flex flex-wrap gap-3">
                 <Link
                     href={`/series/${seriesId}`}
-                    className="flex-1 min-w-[170px] rounded-lg border border-cyan-900/60 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 transition-colors text-center"
+                    className="flex-1 min-w-[170px] min-h-[44px] inline-flex items-center justify-center rounded-lg border border-cyan-900/60 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 transition-colors text-center"
                 >
                     Back to Series
                 </Link>
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-1 min-w-[170px] rounded-lg bg-cyan-500/90 text-[#031018] px-4 py-2.5 text-sm font-semibold hover:bg-cyan-400 disabled:opacity-50 transition-colors"
+                    aria-busy={saving}
+                    className="flex-1 min-w-[170px] min-h-[44px] rounded-lg bg-cyan-500/90 text-[#031018] px-4 py-2.5 text-sm font-semibold hover:bg-cyan-400 disabled:opacity-50 transition-colors"
                 >
                     {saving ? "Saving..." : "Save and Mark Watched"}
                 </button>

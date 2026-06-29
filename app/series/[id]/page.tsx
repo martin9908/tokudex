@@ -3,6 +3,8 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import EpisodeList from "../../components/EpisodeList";
 import AddSeriesButton from "../../components/AddSeriesButton";
+import LogEpisodeButton from "../../components/LogEpisodeButton";
+import { statusBadgeClass, statusLabel } from "@/lib/status";
 import tokudexIcon from "../../../assets/tokudex_icon.png";
 
 type SeriesDetailPageProps = {
@@ -74,40 +76,39 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
         (currentEpisode / (series.total_episodes || 1)) * 100
     );
     const nextEpisode = Math.min(currentEpisode + 1, series.total_episodes || 1);
-
-    const franchiseMeta: Record<string, string> = {
-        "Kamen Rider": "2000-2001",
-        "Super Sentai": "2023-2024",
-        Ultraman: "2023",
-    };
+    const hasNext = isTracking && (!series.total_episodes || currentEpisode < series.total_episodes);
 
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
             <section className="relative overflow-hidden rounded-3xl border border-cyan-900/50 bg-[#05101d] min-h-[330px]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),radial-gradient(circle_at_12%_82%,rgba(8,167,212,0.10),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]" />
-                <div className="pointer-events-none absolute inset-y-0 right-6 hidden md:flex items-center">
-                    <div className="relative">
-                        <div className="absolute inset-0 rounded-2xl bg-cyan-400/15 blur-2xl" />
-                        <div className="relative h-[290px] w-[200px] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/75 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
-                            {series.cover_image_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                    src={series.cover_image_url}
-                                    alt={series.title}
-                                    className="h-full w-full object-contain object-center p-3"
-                                />
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center p-4">
-                                    <Image src={tokudexIcon} alt="" className="w-20 h-20 opacity-85" />
-                                </div>
-                            )}
-                            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,9,19,0.08)_0%,rgba(2,9,19,0.18)_60%,rgba(2,9,19,0.38)_100%)]" />
+                <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 md:grid-cols-[1fr_200px] lg:grid-cols-[1fr_220px] gap-6 md:gap-8 items-start">
+                    {/* Poster — above the text on mobile, to the right on md+ */}
+                    <div className="order-first md:order-last">
+                        <div className="relative mx-auto w-[140px] sm:w-[160px] md:w-full md:max-w-[220px]">
+                            <div className="absolute inset-0 rounded-2xl bg-cyan-400/15 blur-2xl" />
+                            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/75 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
+                                {series.cover_image_url ? (
+                                    <Image
+                                        src={series.cover_image_url}
+                                        alt={series.title}
+                                        fill
+                                        sizes="(max-width: 768px) 160px, 220px"
+                                        className="object-cover object-center"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center p-4">
+                                        <Image src={tokudexIcon} alt="" className="w-20 h-20 opacity-85" />
+                                    </div>
+                                )}
+                                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,9,19,0.08)_0%,rgba(2,9,19,0.18)_60%,rgba(2,9,19,0.38)_100%)]" />
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-                    <div>
-                        <p className="text-xs tracking-[0.3em] uppercase text-red-400/85 mb-3">
+
+                    {/* Content */}
+                    <div className="order-last md:order-first">
+                        <p className="text-xs tracking-[0.3em] uppercase text-cyan-300/80 mb-3">
                             {series.franchise || "Series"}
                         </p>
                         <h1 className="text-4xl md:text-5xl font-bold leading-[0.95] mb-3">
@@ -116,70 +117,98 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                         <p className="text-cyan-100/80 text-base leading-relaxed max-w-2xl mb-5">
                             {series.synopsis}
                         </p>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-cyan-200/75 mb-5">
-                            <span>
-                                {series.original_run || (series.franchise
-                                    ? franchiseMeta[series.franchise] || "N/A"
-                                    : "N/A")}
-                            </span>
-                            <span className="opacity-40">|</span>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-cyan-200/75 mb-4">
+                            {series.original_run && (
+                                <>
+                                    <span>{series.original_run}</span>
+                                    <span className="opacity-40">|</span>
+                                </>
+                            )}
                             <span>{series.total_episodes || "?"} Episodes</span>
-                            <span className="opacity-40">|</span>
-                            <span>{progress?.status || "Planning"}</span>
+                            <span
+                                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(progress?.status)}`}
+                            >
+                                {statusLabel(progress?.status)}
+                            </span>
                         </div>
-                        <div className="h-2 w-full max-w-lg rounded-full bg-cyan-950/85 overflow-hidden mb-2">
-                            <div className="h-full bg-cyan-400" style={{ width: `${progressPercent}%` }} />
+
+                        <div className="max-w-lg mb-5">
+                            <div
+                                role="progressbar"
+                                aria-valuenow={progressPercent}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-label={`${currentEpisode} of ${series.total_episodes || "?"} episodes tracked`}
+                                className="h-2 w-full rounded-full bg-cyan-950/85 overflow-hidden mb-1.5"
+                            >
+                                <div className="h-full bg-cyan-400" style={{ width: `${progressPercent}%` }} />
+                            </div>
+                            <p className="text-sm text-cyan-100/70">
+                                {currentEpisode} / {series.total_episodes || "?"} episodes tracked
+                            </p>
                         </div>
-                        <p className="text-sm text-cyan-100/70">
-                            {currentEpisode} / {series.total_episodes || "?"} episodes tracked
-                        </p>
-                        {series.copyright_notice && (
-                            <p className="mt-6 text-[11px] text-zinc-400/80">
-                                {series.copyright_notice}
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            {isTracking ? (
+                                hasNext ? (
+                                    <LogEpisodeButton
+                                        seriesId={series.id}
+                                        seriesTitle={series.title}
+                                        episodeNumber={nextEpisode}
+                                        className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-5 text-sm font-semibold transition-colors"
+                                    />
+                                ) : (
+                                    <span className="inline-flex min-h-[44px] items-center rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 text-sm font-medium text-emerald-200">
+                                        ✓ Series completed
+                                    </span>
+                                )
+                            ) : (
+                                <AddSeriesButton seriesId={series.id} className="min-h-[44px]" />
+                            )}
+                            <a
+                                href="#episode-list"
+                                className="tdx-focus-ring rounded-lg text-sm text-cyan-300/85 hover:text-cyan-200"
+                            >
+                                Browse episodes ↓
+                            </a>
+                        </div>
+
+                        {!isTracking && (
+                            <p className="mt-3 text-xs text-cyan-200/75">
+                                Add this series to your tracker, or tap an episode below to start logging.
                             </p>
                         )}
-                    </div>
 
-                    <div className="rounded-2xl border max-w-2xs border-cyan-900/45 bg-[#07182a]/75 p-4 md:p-5">
-                        {isTracking ? (
-                            <>
-                                <p className="text-cyan-100 text-xl font-semibold mb-3">Next Episode</p>
-                                <div className="space-y-3 gap-15 flex flex-col">
-                                    <p className="text-cyan-300 text-sm font-semibold">
-                                        Episode {nextEpisode}
-                                    </p>
-                                    <Link
-                                        href={`/watch?series=${series.id}&episode=${nextEpisode}`}
-                                        className="inline-flex w-full justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-4 py-2.5 text-sm font-semibold transition-colors"
-                                    >
-                                        Log Episode {nextEpisode}
-                                    </Link>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-cyan-100 text-xl font-semibold mb-1">Not Tracking Yet</p>
-                                <p className="text-xs text-cyan-200/65 mb-3">
-                                    Add this series to your tracker, or tap an episode below to start logging.
-                                </p>
-                                <AddSeriesButton seriesId={series.id} />
-                            </>
+                        <p className="mt-5 max-w-lg text-xs text-cyan-200/60">
+                            TokuDex remembers your progress and recaps — it doesn&apos;t stream episodes.
+                        </p>
+                        {series.copyright_notice && (
+                            <p className="mt-4 text-[11px] text-cyan-200/45">
+                                {series.copyright_notice}
+                            </p>
                         )}
                     </div>
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#061321]/75 backdrop-blur-xl p-4 md:p-5">
+            <section id="episode-list" className="scroll-mt-20 rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <h2 className="text-2xl font-semibold">Episode List</h2>
-                    <p className="text-sm text-cyan-200/65">Tap an episode to update progress</p>
+                    <p className="text-sm text-cyan-200/65">Tap an episode to log it in a popup</p>
                 </div>
-                <EpisodeList
-                    seriesId={series.id}
-                    totalEpisodes={series.total_episodes || 0}
-                    currentEpisode={currentEpisode}
-                    episodes={episodes ?? []}
-                />
+                {series.total_episodes && series.total_episodes > 0 ? (
+                    <EpisodeList
+                        seriesId={series.id}
+                        seriesTitle={series.title}
+                        totalEpisodes={series.total_episodes}
+                        currentEpisode={currentEpisode}
+                        episodes={episodes ?? []}
+                    />
+                ) : (
+                    <p className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-4 text-sm text-cyan-100/70">
+                        No episodes are listed for this series yet.
+                    </p>
+                )}
             </section>
         </div>
     );

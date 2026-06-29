@@ -29,17 +29,16 @@ export default function SeriesCard({
     return (
         <Link
             href={`/series/${id}`}
-            className="group flex h-full flex-col gap-3 rounded-3xl border border-cyan-900/45 bg-[#041024]/82 p-4 hover:border-cyan-700/45 hover:bg-[#07182c]/88 transition-colors"
+            className="tdx-focus-ring group flex h-full flex-col gap-3 rounded-3xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 hover:border-cyan-700/45 hover:bg-[#07182c]/80 transition-colors"
         >
             <div className="relative mx-auto aspect-[3/4] w-full max-w-[170px] shrink-0 overflow-hidden rounded-2xl border border-cyan-900/40 bg-[#10141f]">
                 {thumbnailUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                         src={thumbnailUrl}
                         alt={title}
-                        className="absolute inset-0 block h-full w-full scale-[1.03] object-cover object-[50%_30%]"
-                        loading="lazy"
-                        decoding="async"
+                        fill
+                        sizes="170px"
+                        className="scale-[1.03] object-cover object-[50%_30%]"
                     />
                 ) : (
                     <div className="flex h-full w-full items-center justify-center">
@@ -51,7 +50,7 @@ export default function SeriesCard({
                     </div>
                 )}
             </div>
-            <div>
+            <div className="flex flex-1 flex-col">
                 <div className="flex items-start justify-between gap-2 mb-1">
                     <span className="line-clamp-1 font-semibold text-xl leading-tight tracking-tight text-cyan-50/95">
                         {title}
@@ -69,21 +68,30 @@ export default function SeriesCard({
                     <p className="text-xs text-cyan-200/75 mb-2">{franchise}</p>
                 )}
                 {synopsis && (
-                    <p className="text-xs text-cyan-100/62 line-clamp-2 mb-3 leading-snug">
+                    <p className="text-xs text-cyan-100/75 line-clamp-2 mb-3 leading-snug">
                         {synopsis}
                     </p>
                 )}
-                <div className="h-2 w-full rounded-full bg-cyan-950/75 overflow-hidden">
+                <div className="mt-auto pt-2">
                     <div
-                        className="h-full rounded-full bg-cyan-300 transition-all"
-                        style={{ width: `${progress}%` }}
-                    />
+                        role="progressbar"
+                        aria-valuenow={progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${watchedEpisodes} of ${totalEpisodes} episodes watched`}
+                        className="h-2 w-full rounded-full bg-cyan-950/75 overflow-hidden"
+                    >
+                        <div
+                            className="h-full rounded-full bg-cyan-300 transition-all"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                    {copyrightNotice && (
+                        <p className="mt-3 text-[11px] text-cyan-200/45 line-clamp-1">
+                            {copyrightNotice}
+                        </p>
+                    )}
                 </div>
-                {copyrightNotice && (
-                    <p className="mt-3 text-[11px] text-zinc-400/80 line-clamp-1">
-                        {copyrightNotice}
-                    </p>
-                )}
             </div>
         </Link>
     );

@@ -1,8 +1,8 @@
 :root {
   /* Core color tokens */
-  --background: #090c10;
-  --surface: #151a22;
-  --surface-elevated: #1e2530;
+  --background: #060b13;
+  --surface: #0c1622;
+  --surface-elevated: #12202f;
   --accent-primary: #00c8ff;
   --accent-secondary: #7a5cff;
   --success: #3ddc97;

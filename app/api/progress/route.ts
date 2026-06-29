@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { validateProgressInput } from "@/lib/validation";
 
 /**
  * POST /api/progress - Update or create user series progress
@@ -17,19 +18,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const {
-            seriesId,
-            currentEpisode,
-            status,
-        }: {
-            seriesId: string;
-            currentEpisode: number;
-            status: "watching" | "completed" | "on_hold" | "plan_to_watch";
-        } = await request.json();
-
-        if (!seriesId || currentEpisode === undefined || !status) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        const validation = validateProgressInput(await request.json());
+        if (!validation.ok) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
         }
+        const { seriesId, currentEpisode, status } = validation.value;
 
         const { data, error } = await client
             .from("user_series_progress")
