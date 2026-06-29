@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -19,6 +19,13 @@ export const metadata: Metadata = {
   title: "TokuDex — Tokusatsu Episode Tracker",
   description:
     "Track which tokusatsu episode you're on and what happened last. TokuDex is an episode tracker — it does not stream video.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#060b13",
 };
 
 export default function RootLayout({

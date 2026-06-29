@@ -2,7 +2,20 @@
 @import "./styles/tokens.css";
 @import "./styles/components.css";
 
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 body {
   background: var(--background);
   color: var(--text-primary);
+}
+
+.ios-safe-top {
+  padding-top: var(--safe-top);
+}
+
+.ios-safe-bottom {
+  padding-bottom: var(--safe-bottom);
 }

@@ -8,11 +8,11 @@ const config: CapacitorConfig = {
   webDir: 'public',
   ...(serverUrl
     ? {
-        server: {
-          url: serverUrl,
-          cleartext: serverUrl.startsWith('http://'),
-        },
-      }
+      server: {
+        url: serverUrl,
+        cleartext: serverUrl.startsWith('http://'),
+      },
+    }
     : {}),
 };
 

@@ -12,7 +12,7 @@ export default async function Navbar() {
     } = await supabase.auth.getUser();
 
     return (
-        <nav className="sticky top-0 z-30 border-b border-cyan-950/70 bg-[#12202f]/85 backdrop-blur-xl">
+        <nav className="ios-safe-top sticky top-0 z-30 border-b border-cyan-950/70 bg-[#12202f]/85 backdrop-blur-xl">
             <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
                 <Link href="/" className="flex items-center gap-2.5">
                     <Image

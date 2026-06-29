@@ -44,7 +44,7 @@ export default function MobileTabBar() {
     const pathname = usePathname();
 
     return (
-        <nav className="fixed bottom-0 inset-x-0 z-20 border-t border-cyan-950/70 bg-[#12202f]/95 backdrop-blur-xl md:hidden">
+        <nav className="ios-safe-bottom fixed bottom-0 inset-x-0 z-20 border-t border-cyan-950/70 bg-[#12202f]/95 backdrop-blur-xl md:hidden">
             <ul className="mx-auto max-w-3xl grid grid-cols-2">
                 {TABS.map((tab) => {
                     const active = tab.match(pathname);
