@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import LogEpisodeButton from "./components/LogEpisodeButton";
-import SupportLink from "./components/SupportLink";
+import SupportBanner from "./components/SupportBanner";
 import Achievements from "./components/Achievements";
 import FranchiseAchievements from "./components/FranchiseAchievements";
 import tokudexIcon from "../assets/tokudex_icon.png";
@@ -176,10 +176,6 @@ export default async function Home() {
                 Continue.
               </p>
             </div>
-            <SupportLink
-              label="☕ Support TokuDex"
-              className="tdx-focus-ring flex items-center justify-center rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 px-3 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 transition-colors"
-            />
           </div>
         </aside>
 
@@ -463,6 +459,8 @@ export default async function Home() {
           </section>
             </>
           )}
+
+          <SupportBanner />
         </main>
       </div>
     </div>
