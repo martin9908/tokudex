@@ -4,6 +4,8 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import MobileTabBar from "./components/MobileTabBar";
+import AchievementToaster from "./components/AchievementToaster";
+import { getEarnedAchievements } from "@/lib/achievementState";
 
 const bodyFont = Inter({
   variable: "--font-body",
@@ -28,11 +30,13 @@ export const viewport: Viewport = {
   themeColor: "#060b13",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const achievementState = await getEarnedAchievements();
+
   return (
     <html
       lang="en"
@@ -42,6 +46,12 @@ export default function RootLayout({
         <Navbar />
         <main className="flex-1">{children}</main>
         <MobileTabBar />
+        {achievementState && (
+          <AchievementToaster
+            earned={achievementState.earned}
+            labels={achievementState.labels}
+          />
+        )}
         <Analytics />
       </body>
     </html>

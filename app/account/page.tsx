@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "../components/SignOutButton";
+import SupportLink from "../components/SupportLink";
 import EditNameForm from "./EditNameForm";
 import ChangePasswordForm from "./ChangePasswordForm";
 import DeleteAccountButton from "./DeleteAccountButton";
@@ -58,6 +59,10 @@ export default async function AccountPage() {
                 <Link href="/terms" className="hover:text-cyan-200">Terms</Link>
                 <span className="mx-2 opacity-40">·</span>
                 <Link href="/privacy" className="hover:text-cyan-200">Privacy</Link>
+                <SupportLink
+                    label="Support ☕"
+                    className="ml-2 border-l border-cyan-900/60 pl-2 hover:text-cyan-200"
+                />
             </p>
         </div>
     );

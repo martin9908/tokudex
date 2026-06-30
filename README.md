@@ -2,7 +2,7 @@
 
 > Remember. Track. Continue.
 
-A modern tokusatsu (Japanese live-action special effects) episode tracker built with [Next.js](https://nextjs.org) and [Capacitor](https://capacitorjs.com). Track your progress across Super Sentai, Ultraman, and other tokusatsu series with a clean, responsive interface.
+A modern tokusatsu (Japanese live-action special effects) episode tracker built with [Next.js](https://nextjs.org). Track your progress across Super Sentai, Ultraman, and other tokusatsu series with a clean, responsive interface.
 
 ## Features
 
@@ -11,15 +11,13 @@ A modern tokusatsu (Japanese live-action special effects) episode tracker built 
 - 🔔 **Progress Tracking** — Visual progress bars and episode counts per series
 - 🎬 **Series Library** — Browse curated tokusatsu series catalog
 - 🔐 **Supabase Auth** — Secure account management
-- 📲 **Native Apps** — iOS and Android apps via Capacitor
 - 🌙 **Dark Theme** — Eye-friendly cyan/dark color scheme
 
 ## Tech Stack
 
 - **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS 4
 - **Backend**: Supabase (PostgreSQL + Auth + Storage)
-- **Mobile**: Capacitor 8 (iOS + Android)
-- **Deployment**: Vercel (web), native app stores (iOS/Android)
+- **Deployment**: Vercel (web)
 
 ## Getting Started
 
@@ -27,8 +25,6 @@ A modern tokusatsu (Japanese live-action special effects) episode tracker built 
 
 - Node.js 18+ and npm 9+
 - Supabase account (free tier available)
-- Xcode (macOS, for iOS development)
-- Android Studio (for Android development)
 
 ### Setup
 
@@ -63,27 +59,6 @@ npm run build
 npm run start
 ```
 
-**Native Apps (Capacitor)**:
-```bash
-# Build Next.js first
-npm run build
-
-# Sync web assets to native projects
-npm run cap:sync
-
-# Open iOS project
-npm run cap:ios
-
-# Open Android project
-npm run cap:android
-```
-
-For remote app loading in native shells, set the environment variable before syncing:
-```bash
-export CAPACITOR_SERVER_URL=https://your-deployed-app.vercel.app
-npm run cap:sync
-```
-
 ## Project Structure
 
 ```
@@ -102,10 +77,7 @@ npm run cap:sync
 ├── lib/                       # Utilities
 │   ├── supabase/              # Supabase client & queries
 │   └── validation.ts          # Input validation
-├── ios/                       # Native iOS project (Xcode)
-├── android/                   # Native Android project (Gradle)
-├── capacitor.config.ts        # Capacitor configuration
-└── public/                    # Static assets & fallback HTML
+└── public/                    # Static assets
 ```
 
 ## Episode Logging

@@ -34,7 +34,11 @@ export default async function Navbar() {
                     >
                         Series
                     </Link>
-                    <span className="text-cyan-100/45">Watchlist</span>
+                    {user && (
+                        <Link href="/achievements" className="hover:text-cyan-300 transition-colors">
+                            Achievements
+                        </Link>
+                    )}
                     {user && (
                         <Link href="/account" className="hover:text-cyan-300 transition-colors">
                             Account

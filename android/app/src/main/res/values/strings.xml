@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">TokuDex</string>
-    <string name="title_activity_main">TokuDex</string>
-    <string name="package_name">com.mytokutracker.app</string>
-    <string name="custom_url_scheme">com.mytokutracker.app</string>
-</resources>

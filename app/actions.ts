@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { syncAchievements } from "@/lib/achievementState";
 import { isUuid, PROGRESS_STATUSES, NOTE_MAX_LENGTH } from "@/lib/validation";
 
 type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
@@ -55,6 +56,8 @@ export async function setEpisodeProgress(seriesId: string, episode: number) {
 
     if (error) throw new Error(error.message);
 
+    await syncAchievements();
+
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");
     revalidatePath("/");
@@ -89,6 +92,8 @@ export async function addSeriesToTracker(seriesId: string) {
     );
 
     if (error) throw new Error(error.message);
+
+    await syncAchievements();
 
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");
@@ -165,6 +170,8 @@ export async function saveEpisodeCheckIn(
 
         if (noteError) throw new Error(noteError.message);
     }
+
+    await syncAchievements();
 
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");

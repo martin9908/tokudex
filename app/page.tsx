@@ -2,6 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import LogEpisodeButton from "./components/LogEpisodeButton";
+import SupportLink from "./components/SupportLink";
+import Achievements from "./components/Achievements";
+import FranchiseAchievements from "./components/FranchiseAchievements";
 import tokudexIcon from "../assets/tokudex_icon.png";
 import tokudexLogo from "../assets/tokudex_logo.png";
 
@@ -112,6 +115,10 @@ export default async function Home() {
   const primaryNext = Math.min(primaryCurrent + 1, primaryTotal || primaryCurrent + 1);
   const primaryHasNext = !!primaryItem && primaryCurrent < (primaryTotal || Infinity);
 
+  const completedSeries = watchItems
+    .filter((item) => item.progress.status === "completed")
+    .map((item) => ({ title: item.series.title, franchise: item.series.franchise }));
+
   return (
     <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10">
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
@@ -169,6 +176,10 @@ export default async function Home() {
                 Continue.
               </p>
             </div>
+            <SupportLink
+              label="☕ Support TokuDex"
+              className="tdx-focus-ring flex items-center justify-center rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 px-3 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 transition-colors"
+            />
           </div>
         </aside>
 
@@ -395,6 +406,14 @@ export default async function Home() {
               </p>
             )}
           </section>
+
+          <Achievements
+            seriesTracked={totalTracked}
+            episodesLogged={episodesLogged}
+            seriesCompleted={stats.completed}
+          />
+
+          <FranchiseAchievements completed={completedSeries} />
 
           <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
             <div className="flex items-center justify-between mb-3">
