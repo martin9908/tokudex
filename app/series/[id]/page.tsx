@@ -78,6 +78,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
     const nextEpisode = Math.min(currentEpisode + 1, series.total_episodes || 1);
     const hasNext = isTracking && (!series.total_episodes || currentEpisode < series.total_episodes);
     const nextEpisodeData = (episodes ?? []).find((e) => e.episode_number === nextEpisode);
+    const lastEpisodeData = (episodes ?? []).find((e) => e.episode_number === currentEpisode);
 
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
@@ -193,6 +194,27 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                     </div>
                 </div>
             </section>
+
+            {isTracking && currentEpisode >= 1 && (
+                <section className="rounded-2xl border border-cyan-600/40 bg-cyan-500/[0.07] p-4 md:p-5">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300/80 mb-1">
+                        Where you left off
+                    </p>
+                    <h2 className="text-lg font-semibold">
+                        Episode {currentEpisode}
+                        {lastEpisodeData?.title ? ` · ${lastEpisodeData.title}` : ""}
+                    </h2>
+                    {lastEpisodeData?.synopsis ? (
+                        <p className="mt-2 text-sm text-cyan-100/85 leading-relaxed max-w-3xl">
+                            {lastEpisodeData.synopsis}
+                        </p>
+                    ) : (
+                        <p className="mt-2 text-sm text-cyan-200/60">
+                            No recap available for this episode yet.
+                        </p>
+                    )}
+                </section>
+            )}
 
             <section id="episode-list" className="scroll-mt-20 rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
