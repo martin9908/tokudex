@@ -30,6 +30,20 @@ function SeriesIcon() {
     );
 }
 
+function TrophyIcon() {
+    return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+                d="M7 4h10v3a5 5 0 0 1-10 0V4Zm0 1H4v2a3 3 0 0 0 3 3m10-5h3v2a3 3 0 0 1-3 3M9 13.5h6M12 12v3m-3 5h6M10 17.5h4V20h-4z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+
 const TABS = [
     { href: "/", label: "Home", Icon: HomeIcon, match: (p: string) => p === "/" },
     {
@@ -38,6 +52,12 @@ const TABS = [
         Icon: SeriesIcon,
         match: (p: string) => p.startsWith("/series"),
     },
+    {
+        href: "/achievements",
+        label: "Awards",
+        Icon: TrophyIcon,
+        match: (p: string) => p.startsWith("/achievements"),
+    },
 ];
 
 export default function MobileTabBar() {
@@ -45,7 +65,7 @@ export default function MobileTabBar() {
 
     return (
         <nav className="ios-safe-bottom fixed bottom-0 inset-x-0 z-20 border-t border-cyan-950/70 bg-[#12202f]/95 backdrop-blur-xl md:hidden">
-            <ul className="mx-auto max-w-3xl grid grid-cols-2">
+            <ul className="mx-auto max-w-3xl grid grid-cols-3">
                 {TABS.map((tab) => {
                     const active = tab.match(pathname);
                     return (
