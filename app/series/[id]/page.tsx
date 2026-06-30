@@ -77,6 +77,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
     );
     const nextEpisode = Math.min(currentEpisode + 1, series.total_episodes || 1);
     const hasNext = isTracking && (!series.total_episodes || currentEpisode < series.total_episodes);
+    const nextEpisodeData = (episodes ?? []).find((e) => e.episode_number === nextEpisode);
 
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
@@ -155,6 +156,8 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                                         seriesId={series.id}
                                         seriesTitle={series.title}
                                         episodeNumber={nextEpisode}
+                                        episodeTitle={nextEpisodeData?.title ?? null}
+                                        episodeSynopsis={nextEpisodeData?.synopsis ?? null}
                                         className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-5 text-sm font-semibold transition-colors"
                                     />
                                 ) : (

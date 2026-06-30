@@ -14,6 +14,7 @@ type EpisodeCheckInModalProps = {
     seriesTitle: string;
     episodeNumber: number;
     episodeTitle?: string | null;
+    episodeSynopsis?: string | null;
     onClose: () => void;
     onSaved?: () => void;
 };
@@ -24,6 +25,7 @@ export default function EpisodeCheckInModal({
     seriesTitle,
     episodeNumber,
     episodeTitle,
+    episodeSynopsis,
     onClose,
     onSaved,
 }: EpisodeCheckInModalProps) {
@@ -118,6 +120,15 @@ export default function EpisodeCheckInModal({
                 <p className="mb-4 text-sm text-cyan-100/70">
                     Mark how far you&apos;ve watched and jot a recap so you remember what happened next time.
                 </p>
+
+                {episodeSynopsis && (
+                    <div className="mb-4 rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3">
+                        <p className="text-[11px] uppercase tracking-wider text-cyan-300/70 mb-1">
+                            Episode recap
+                        </p>
+                        <p className="text-sm text-cyan-100/85 leading-relaxed">{episodeSynopsis}</p>
+                    </div>
+                )}
 
                 <div className="space-y-4">
                     <div>

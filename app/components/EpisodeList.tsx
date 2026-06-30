@@ -8,6 +8,7 @@ import { setEpisodeProgress } from "../actions";
 type Episode = {
     episode_number: number;
     title: string | null;
+    synopsis: string | null;
 };
 
 type EpisodeListProps = {
@@ -54,11 +55,18 @@ export default function EpisodeList({
         });
     }
 
-    // Index titles by episode number once, instead of a linear scan per row.
+    // Index titles + synopses by episode number once, instead of a linear scan per row.
     const titlesByNumber = useMemo(() => {
         const map = new Map<number, string>();
         for (const entry of episodes) {
             if (entry.title) map.set(entry.episode_number, entry.title);
+        }
+        return map;
+    }, [episodes]);
+    const synopsisByNumber = useMemo(() => {
+        const map = new Map<number, string>();
+        for (const entry of episodes) {
+            if (entry.synopsis) map.set(entry.episode_number, entry.synopsis);
         }
         return map;
     }, [episodes]);
@@ -149,6 +157,7 @@ export default function EpisodeList({
                     seriesTitle={seriesTitle}
                     episodeNumber={openEpisode}
                     episodeTitle={titlesByNumber.get(openEpisode) ?? null}
+                    episodeSynopsis={synopsisByNumber.get(openEpisode) ?? null}
                     onClose={() => setOpenEpisode(null)}
                 />
             )}
