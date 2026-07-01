@@ -60,7 +60,10 @@ export default function PrivacyPage() {
                     <h2 className="text-lg font-semibold text-cyan-50 mb-2">Contact</h2>
                     <p>
                         Questions about your data? Contact us at{" "}
-                        <span className="text-cyan-200">[your-contact-email]</span>.
+                        <a href="mailto:mjhalumsolutions@gmail.com" className="text-cyan-300 hover:text-cyan-200">
+                            mjhalumsolutions@gmail.com
+                        </a>
+                        .
                     </p>
                 </section>
             </div>

@@ -5,6 +5,7 @@ import LogEpisodeButton from "./components/LogEpisodeButton";
 import SupportBanner from "./components/SupportBanner";
 import Achievements from "./components/Achievements";
 import FranchiseAchievements from "./components/FranchiseAchievements";
+import GuestHome from "./components/GuestHome";
 import tokudexIcon from "../assets/tokudex_icon.png";
 import tokudexLogo from "../assets/tokudex_logo.png";
 
@@ -32,6 +33,11 @@ export default async function Home() {
   const {
     data: { user },
   } = await client.auth.getUser();
+
+  // Guests (no account) get a read-only preview instead of the tracker home.
+  if (!user) {
+    return <GuestHome />;
+  }
 
   const fullName = (user?.user_metadata?.full_name as string | undefined)?.trim();
   const displayName = fullName || user?.email?.split("@")[0] || "there";

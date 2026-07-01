@@ -118,6 +118,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                     signUp={signUp}
                     forgotPassword={forgotPassword}
                 />
+                <div className="mt-5 border-t border-cyan-900/50 pt-4 text-center">
+                    <Link
+                        href="/"
+                        className="tdx-focus-ring text-sm text-cyan-200/80 hover:text-cyan-100"
+                    >
+                        Browse as guest →
+                    </Link>
+                </div>
                 <p className="mt-6 text-center text-xs text-cyan-200/55">
                     By continuing you agree to our{" "}
                     <Link href="/terms" className="text-cyan-300/80 hover:text-cyan-200">

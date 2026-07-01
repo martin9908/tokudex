@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import EpisodeCheckInModal from "./EpisodeCheckInModal";
@@ -17,6 +18,7 @@ type EpisodeListProps = {
     totalEpisodes: number;
     currentEpisode: number;
     episodes: Episode[];
+    guest?: boolean;
 };
 
 export default function EpisodeList({
@@ -25,6 +27,7 @@ export default function EpisodeList({
     totalEpisodes,
     currentEpisode,
     episodes,
+    guest = false,
 }: EpisodeListProps) {
     const router = useRouter();
     const [openEpisode, setOpenEpisode] = useState<number | null>(null);
@@ -55,7 +58,7 @@ export default function EpisodeList({
         });
     }
 
-    // Index titles + synopses by episode number once, instead of a linear scan per row.
+    // Index titles by episode number once, instead of a linear scan per row.
     const titlesByNumber = useMemo(() => {
         const map = new Map<number, string>();
         for (const entry of episodes) {
@@ -78,7 +81,22 @@ export default function EpisodeList({
                     {error}
                 </p>
             )}
-            {totalEpisodes > 12 && currentEpisode < totalEpisodes && (
+
+            {guest && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-600/40 bg-cyan-500/10 px-3 py-2">
+                    <p className="text-sm text-cyan-100/85">
+                        Sign up to log episodes, save recaps, and track your progress.
+                    </p>
+                    <Link
+                        href="/login"
+                        className="tdx-focus-ring rounded-lg bg-cyan-500/90 px-3 py-1.5 text-xs font-semibold text-[#031018] hover:bg-cyan-400 transition-colors"
+                    >
+                        Sign up
+                    </Link>
+                </div>
+            )}
+
+            {!guest && totalEpisodes > 12 && currentEpisode < totalEpisodes && (
                 <div className="mb-3 flex justify-end">
                     <button
                         type="button"
@@ -89,6 +107,7 @@ export default function EpisodeList({
                     </button>
                 </div>
             )}
+
             <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {Array.from({ length: totalEpisodes }, (_, index) => {
                     const episodeNumber = index + 1;
@@ -102,54 +121,70 @@ export default function EpisodeList({
                             <div
                                 className={`rounded-xl border p-3 transition-colors ${isWatched
                                     ? "border-cyan-500/55 bg-cyan-500/15"
-                                    : isNext
+                                    : isNext && !guest
                                         ? "border-cyan-600/40 bg-[#0a2034]/80"
                                         : "border-cyan-900/45 bg-[#081a2b]/70"
                                     }`}
                             >
-                                <button
-                                    type="button"
-                                    ref={isNext ? nextRef : undefined}
-                                    onClick={() => setOpenEpisode(episodeNumber)}
-                                    aria-label={`Log episode ${episodeNumber} with a recap`}
-                                    className="tdx-focus-ring block w-full rounded-lg text-left"
-                                >
-                                    <div className="flex items-center justify-between gap-3">
+                                {guest ? (
+                                    <div>
                                         <span className="text-sm font-semibold text-cyan-100/95">
-                                            {isWatched && "✓ "}
                                             Episode {episodeNumber}
                                         </span>
-                                        <span className="text-xs text-cyan-200/75">
-                                            {isWatched ? "Watched" : isNext ? "Up next" : "Not logged"}
-                                        </span>
+                                        {title && (
+                                            <p className="text-xs text-cyan-100/80 mt-1 line-clamp-2">
+                                                {title}
+                                            </p>
+                                        )}
                                     </div>
-                                    {title && (
-                                        <p className="text-xs text-cyan-100/80 mt-1 line-clamp-2">
-                                            {title}
-                                        </p>
-                                    )}
-                                    <p className="mt-2 text-[11px] text-cyan-300/80">Log with recap →</p>
-                                </button>
-                                <div className="mt-2 flex justify-end border-t border-cyan-900/40 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => quickMark(episodeNumber, isWatched)}
-                                        disabled={isPending}
-                                        className="tdx-focus-ring rounded-lg px-2 py-1 text-xs font-medium text-cyan-200/85 hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
-                                    >
-                                        {isPending
-                                            ? "Saving…"
-                                            : isWatched
-                                                ? "Unmark"
-                                                : "✓ Mark watched"}
-                                    </button>
-                                </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            type="button"
+                                            ref={isNext ? nextRef : undefined}
+                                            onClick={() => setOpenEpisode(episodeNumber)}
+                                            aria-label={`Log episode ${episodeNumber} with a recap`}
+                                            className="tdx-focus-ring block w-full rounded-lg text-left"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-sm font-semibold text-cyan-100/95">
+                                                    {isWatched && "✓ "}
+                                                    Episode {episodeNumber}
+                                                </span>
+                                                <span className="text-xs text-cyan-200/75">
+                                                    {isWatched ? "Watched" : isNext ? "Up next" : "Not logged"}
+                                                </span>
+                                            </div>
+                                            {title && (
+                                                <p className="text-xs text-cyan-100/80 mt-1 line-clamp-2">
+                                                    {title}
+                                                </p>
+                                            )}
+                                            <p className="mt-2 text-[11px] text-cyan-300/80">Log with recap →</p>
+                                        </button>
+                                        <div className="mt-2 flex justify-end border-t border-cyan-900/40 pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => quickMark(episodeNumber, isWatched)}
+                                                disabled={isPending}
+                                                className="tdx-focus-ring rounded-lg px-2 py-1 text-xs font-medium text-cyan-200/85 hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
+                                            >
+                                                {isPending
+                                                    ? "Saving…"
+                                                    : isWatched
+                                                        ? "Unmark"
+                                                        : "✓ Mark watched"}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </li>
                     );
                 })}
             </ul>
-            {openEpisode !== null && (
+
+            {!guest && openEpisode !== null && (
                 <EpisodeCheckInModal
                     key={openEpisode}
                     open

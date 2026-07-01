@@ -30,9 +30,13 @@ export async function proxy(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser();
 
-    // Redirect unauthenticated users away from protected routes.
+    // Redirect unauthenticated users away from protected routes. Guests may
+    // browse the home page and individual series pages (read-only); the full
+    // library, account, achievements, watch, and API stay members-only.
     const { pathname } = request.nextUrl;
     const isPublic =
+        pathname === "/" ||
+        pathname.startsWith("/series/") ||
         pathname.startsWith("/login") ||
         pathname.startsWith("/auth") ||
         pathname.startsWith("/terms") ||
