@@ -44,13 +44,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         const password = formData.get("password") as string;
         const fullName = (formData.get("name") as string | null)?.trim();
 
-        const origin = await getOrigin();
         const supabase = await createClient();
+        // Email confirmation is disabled in Supabase for the soft launch, so a
+        // successful signUp returns a session and writes the auth cookie here —
+        // the user is signed in immediately and lands on the home page.
         const { error: authError } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                emailRedirectTo: `${origin}/auth/callback`,
                 data: fullName ? { full_name: fullName } : undefined,
             },
         });
@@ -59,11 +60,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             redirect(`/login?error=${encodeURIComponent(authError.message)}`);
         }
 
-        redirect(
-            `/login?message=${encodeURIComponent(
-                "Account created. Check your email to confirm your account."
-            )}`
-        );
+        redirect("/");
     }
 
     async function forgotPassword(formData: FormData) {

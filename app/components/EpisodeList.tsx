@@ -32,12 +32,38 @@ export default function EpisodeList({
     const router = useRouter();
     const [openEpisode, setOpenEpisode] = useState<number | null>(null);
     const [pending, setPending] = useState<number | null>(null);
+    const [bulkPending, setBulkPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
     const nextRef = useRef<HTMLButtonElement>(null);
 
     function scrollToNext() {
         nextRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    // Bulk action: mark the whole series watched in one server round-trip. The
+    // action clamps to total_episodes and flips status to "completed". Reversible
+    // by unmarking episode 1 (which rewinds progress to zero).
+    function markAll() {
+        if (
+            !window.confirm(
+                `Mark all ${totalEpisodes} episodes of ${seriesTitle} as watched?`
+            )
+        ) {
+            return;
+        }
+        setBulkPending(true);
+        setError(null);
+        startTransition(async () => {
+            try {
+                await setEpisodeProgress(seriesId, totalEpisodes);
+                router.refresh();
+            } catch {
+                setError("Could not update progress. Please try again.");
+            } finally {
+                setBulkPending(false);
+            }
+        });
     }
 
     // Quick action: mark watched up to this episode, or unmark it (rewind to the
@@ -96,14 +122,24 @@ export default function EpisodeList({
                 </div>
             )}
 
-            {!guest && totalEpisodes > 12 && currentEpisode < totalEpisodes && (
-                <div className="mb-3 flex justify-end">
+            {!guest && currentEpisode < totalEpisodes && (
+                <div className="mb-3 flex flex-wrap justify-end gap-2">
+                    {totalEpisodes > 12 && (
+                        <button
+                            type="button"
+                            onClick={scrollToNext}
+                            className="tdx-focus-ring rounded-lg border border-cyan-900/60 px-3 py-1.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
+                        >
+                            Jump to Episode {currentEpisode + 1}
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={scrollToNext}
-                        className="tdx-focus-ring rounded-lg border border-cyan-900/60 px-3 py-1.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
+                        onClick={markAll}
+                        disabled={bulkPending}
+                        className="tdx-focus-ring rounded-lg border border-cyan-600/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 transition-colors"
                     >
-                        Jump to Episode {currentEpisode + 1}
+                        {bulkPending ? "Marking…" : "✓ Mark all as watched"}
                     </button>
                 </div>
             )}
