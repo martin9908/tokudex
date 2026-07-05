@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncAchievements } from "@/lib/achievementState";
 import { trackServer } from "@/lib/analytics";
+import { buildSnapshotFor, generateShareSlug } from "@/lib/share";
 import { isUuid, PROGRESS_STATUSES, NOTE_MAX_LENGTH } from "@/lib/validation";
 
 type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
@@ -189,6 +190,51 @@ export async function saveEpisodeCheckIn(
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");
     revalidatePath("/");
+}
+
+/**
+ * Create (or reuse) a public share card for one of the signed-in user's earned
+ * achievements — or their overall stats ("stats"). Re-derives the snapshot
+ * server-side so a user can't mint a card for something they haven't earned.
+ * Returns the opaque slug for the public /share/[slug] URL.
+ */
+export async function createShareCard(shareKey: string): Promise<{ slug: string }> {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    const snapshot = await buildSnapshotFor(shareKey);
+    if (!snapshot) throw new Error("Nothing to share for this yet");
+
+    // Reuse an existing card for the same moment so repeat shares are stable.
+    const { data: existing } = await client
+        .from("share_cards")
+        .select("slug")
+        .eq("user_id", user.id)
+        .eq("share_key", shareKey)
+        .maybeSingle();
+    if (existing?.slug) return { slug: existing.slug };
+
+    const displayName =
+        (user.user_metadata?.full_name as string | undefined)?.trim() || "A TokuDex fan";
+    const slug = generateShareSlug();
+
+    const { error } = await client.from("share_cards").insert({
+        slug,
+        user_id: user.id,
+        share_key: shareKey,
+        kind: snapshot.kind,
+        title: snapshot.title,
+        subtitle: snapshot.subtitle,
+        stat_label: snapshot.statLabel,
+        stat_value: snapshot.statValue,
+        display_name: displayName,
+    });
+    if (error) throw new Error(error.message);
+
+    return { slug };
 }
 
 /**

@@ -43,6 +43,7 @@ export async function proxy(request: NextRequest) {
         pathname.startsWith("/auth") ||
         pathname.startsWith("/terms") ||
         pathname.startsWith("/privacy") ||
+        pathname.startsWith("/share/") ||
         // SEO / crawler + link-preview routes must be reachable by guests.
         pathname === "/robots.txt" ||
         pathname === "/sitemap.xml" ||

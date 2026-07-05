@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAchievementsView } from "@/lib/achievementState";
 import { Badge, ProgressBar } from "../components/atoms";
+import ShareButton from "../components/molecules/ShareButton";
+import { STATS_SHARE_KEY } from "@/lib/share";
 
 export const metadata = {
     title: "Achievements — TokuDex",
@@ -64,6 +66,14 @@ export default async function AchievementsPage() {
                         ? `${episodesLogged} / ${rankNext.min} episodes logged → ${rankNext.title}`
                         : `${episodesLogged} episodes logged · max rank reached 🎉`}
                 </p>
+                <div className="mt-4">
+                    <ShareButton
+                        shareKey={STATS_SHARE_KEY}
+                        kind="stats"
+                        label="Share my stats"
+                        text={`I'm rank ${rankCurrent.title} with ${episodesLogged} episodes logged on TokuDex!`}
+                    />
+                </div>
             </section>
 
             <AchievementGrid
@@ -158,9 +168,15 @@ function AchievementGrid({
                             </div>
                             <p className="mt-1 text-xs text-cyan-200/70">{a.description}</p>
                             {a.earned ? (
-                                date && (
-                                    <p className="mt-1 text-[11px] text-cyan-300/70">Earned {date}</p>
-                                )
+                                <div className="mt-2">
+                                    {date && (
+                                        <p className="mb-2 text-[11px] text-cyan-300/70">Earned {date}</p>
+                                    )}
+                                    <ShareButton
+                                        shareKey={a.key}
+                                        text={`I unlocked "${a.title}" on TokuDex!`}
+                                    />
+                                </div>
                             ) : (
                                 a.target > 1 && (
                                     <p className="mt-1 text-[11px] text-cyan-300/70">
