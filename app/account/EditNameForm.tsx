@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { buttonClasses } from "../components/atoms";
 
 export default function EditNameForm({ initialName }: { initialName: string }) {
     const router = useRouter();
@@ -54,12 +55,12 @@ export default function EditNameForm({ initialName }: { initialName: string }) {
                         setDone(false);
                     }}
                     placeholder="Your name"
-                    className="min-h-[44px] flex-1 min-w-[180px] rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                    className="min-h-[44px] flex-1 min-w-[180px] tdx-field px-3"
                 />
                 <button
                     type="submit"
                     disabled={saving || name.trim() === initialName.trim()}
-                    className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-4 text-sm font-semibold text-[#031018] transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                    className={buttonClasses({ variant: "primary" })}
                 >
                     {saving ? "Saving…" : "Save"}
                 </button>

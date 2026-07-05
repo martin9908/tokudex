@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveEpisodeCheckIn } from "../../actions";
 import { NOTE_MAX_LENGTH } from "@/lib/validation";
+import { buttonClasses } from "../atoms";
 
 type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
 
@@ -142,7 +143,7 @@ export default function EpisodeCheckInModal({
                             maxLength={NOTE_MAX_LENGTH}
                             onChange={(e) => setNote(e.target.value)}
                             placeholder="What happened in this episode?"
-                            className="w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                            className="tdx-field px-3 py-2.5"
                         />
                         <p className="mt-1 text-right text-xs text-cyan-200/75">
                             {note.length}/{NOTE_MAX_LENGTH}
@@ -158,7 +159,7 @@ export default function EpisodeCheckInModal({
                                 id={statusId}
                                 value={status}
                                 onChange={(e) => setStatus(e.target.value as ProgressStatus)}
-                                className="w-full appearance-none rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 pr-10 text-sm text-cyan-50 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                                className="tdx-field appearance-none px-3 py-2.5 pr-10"
                             >
                                 <option value="watching">Watching</option>
                                 <option value="completed">Completed</option>
@@ -184,7 +185,7 @@ export default function EpisodeCheckInModal({
                         type="button"
                         onClick={onClose}
                         disabled={saving}
-                        className="flex-1 min-w-[150px] min-h-[44px] rounded-lg border border-cyan-900/60 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 disabled:opacity-50"
+                        className={buttonClasses({ variant: "secondary", className: "flex-1 min-w-[150px]" })}
                     >
                         Cancel
                     </button>
@@ -192,7 +193,7 @@ export default function EpisodeCheckInModal({
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex-1 min-w-[150px] min-h-[44px] rounded-lg bg-cyan-500/90 text-[#031018] px-4 py-2.5 text-sm font-semibold hover:bg-cyan-400 disabled:opacity-50"
+                        className={buttonClasses({ variant: "primary", className: "flex-1 min-w-[150px]" })}
                     >
                         {saving ? "Saving..." : "Save and Mark Watched"}
                     </button>

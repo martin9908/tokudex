@@ -86,7 +86,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
     return (
         <div className="flex flex-1 items-center justify-center px-4 py-16">
-            <div className="w-full max-w-sm rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-6 backdrop-blur-xl">
+            <div className="w-full max-w-sm tdx-panel p-6">
                 <h1 className="text-2xl font-semibold tracking-tight mb-1">TokuDex</h1>
                 <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70 mb-2">
                     Tokusatsu Episode Tracker

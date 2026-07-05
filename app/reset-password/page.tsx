@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { buttonClasses } from "../components/atoms";
 
 export default function ResetPasswordPage() {
     const router = useRouter();
@@ -40,12 +41,11 @@ export default function ResetPasswordPage() {
         router.refresh();
     }
 
-    const inputClass =
-        "min-h-[44px] w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60";
+    const inputClass = "min-h-[44px] tdx-field px-3";
 
     return (
         <div className="flex flex-1 items-center justify-center px-4 py-16">
-            <div className="w-full max-w-sm rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-6 backdrop-blur-xl">
+            <div className="w-full max-w-sm tdx-panel p-6">
                 <h1 className="text-2xl font-semibold tracking-tight mb-1">Set a new password</h1>
                 <p className="text-sm text-cyan-200/70 mb-6">
                     Choose a new password for your TokuDex account.
@@ -89,7 +89,7 @@ export default function ResetPasswordPage() {
                     <button
                         type="submit"
                         disabled={saving}
-                        className="tdx-focus-ring mt-1 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-5 text-sm font-semibold text-[#031018] transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                        className={buttonClasses({ variant: "primary", className: "mt-1 px-5" })}
                     >
                         {saving ? "Saving…" : "Update password"}
                     </button>

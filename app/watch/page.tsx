@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import { saveEpisodeCheckIn } from "../actions";
 import { NOTE_MAX_LENGTH } from "@/lib/validation";
+import { Button, LinkButton } from "../components/atoms";
 
 type Series = {
     id: string;
@@ -105,7 +106,7 @@ function WatchPageContent() {
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-10 w-full space-y-4">
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-5">
+            <section className="tdx-panel p-5">
                 <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/70 mb-2">
                     Episode Check-in
                 </p>
@@ -122,7 +123,7 @@ function WatchPageContent() {
                 </section>
             )}
 
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-5 space-y-4">
+            <section className="tdx-panel p-5 space-y-4">
                 <div>
                     <label htmlFor="recap-note" className="text-sm font-medium text-cyan-100/90 block mb-2">
                         Quick recap note
@@ -134,7 +135,7 @@ function WatchPageContent() {
                         maxLength={NOTE_MAX_LENGTH}
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="What happened in this episode?"
-                        className="w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                        className="tdx-field px-3 py-2.5"
                     />
                     <p className="mt-1 text-right text-xs text-cyan-200/75">
                         {note.length}/{NOTE_MAX_LENGTH}
@@ -155,7 +156,7 @@ function WatchPageContent() {
                                     | "plan_to_watch"
                                 )
                             }
-                            className="w-full appearance-none rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 pr-10 text-sm text-cyan-50 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                            className="tdx-field appearance-none px-3 py-2.5 pr-10"
                         >
                             <option value="watching">Watching</option>
                             <option value="completed">Completed</option>
@@ -177,20 +178,21 @@ function WatchPageContent() {
             </section>
 
             <div className="flex flex-wrap gap-3">
-                <Link
+                <LinkButton
                     href={`/series/${seriesId}`}
-                    className="flex-1 min-w-[170px] min-h-[44px] inline-flex items-center justify-center rounded-lg border border-cyan-900/60 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 transition-colors text-center"
+                    variant="secondary"
+                    className="flex-1 min-w-[170px]"
                 >
                     Back to Series
-                </Link>
-                <button
+                </LinkButton>
+                <Button
                     onClick={handleSave}
                     disabled={saving}
                     aria-busy={saving}
-                    className="flex-1 min-w-[170px] min-h-[44px] rounded-lg bg-cyan-500/90 text-[#031018] px-4 py-2.5 text-sm font-semibold hover:bg-cyan-400 disabled:opacity-50 transition-colors"
+                    className="flex-1 min-w-[170px]"
                 >
                     {saving ? "Saving..." : "Save and Mark Watched"}
-                </button>
+                </Button>
             </div>
         </div>
     );

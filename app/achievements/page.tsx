@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAchievementsView } from "@/lib/achievementState";
+import { Badge, ProgressBar } from "../components/atoms";
 
 export const metadata = {
     title: "Achievements — TokuDex",
@@ -48,23 +49,16 @@ export default async function AchievementsPage() {
             </div>
 
             {/* Rank */}
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
+            <section className="tdx-panel p-4 md:p-5">
                 <div className="flex items-center justify-between gap-3 mb-2">
                     <h2 className="text-lg font-semibold">Rank</h2>
-                    <span className="rounded-full border border-cyan-600/40 bg-cyan-500/15 px-2.5 py-0.5 text-xs font-semibold text-cyan-200">
-                        {rankCurrent.title}
-                    </span>
+                    <Badge variant="info" pill>{rankCurrent.title}</Badge>
                 </div>
-                <div
-                    role="progressbar"
-                    aria-valuenow={rankPct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={rankNext ? `${rankPct}% to ${rankNext.title}` : "Max rank"}
-                    className="h-2 w-full rounded-full bg-cyan-950/80 overflow-hidden"
-                >
-                    <div className="h-full bg-cyan-400" style={{ width: `${rankPct}%` }} />
-                </div>
+                <ProgressBar
+                    value={rankPct}
+                    max={100}
+                    label={rankNext ? `${rankPct}% to ${rankNext.title}` : "Max rank"}
+                />
                 <p className="mt-2 text-xs text-cyan-200/70">
                     {rankNext
                         ? `${episodesLogged} / ${rankNext.min} episodes logged → ${rankNext.title}`
@@ -140,7 +134,7 @@ function AchievementGrid({
     const icon = gold ? "🏆" : "🏅";
 
     return (
-        <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
+        <section className="tdx-panel p-4 md:p-5">
             <h2 className="text-lg font-semibold mb-3">{title}</h2>
             <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {items.map((a) => {

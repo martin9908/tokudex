@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { buttonClasses } from "../components/atoms";
 
 export default function ChangePasswordForm() {
     const pwId = useId();
@@ -40,8 +41,7 @@ export default function ChangePasswordForm() {
         setDone(true);
     }
 
-    const inputClass =
-        "min-h-[44px] w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60";
+    const inputClass = "min-h-[44px] tdx-field px-3";
 
     return (
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -88,7 +88,7 @@ export default function ChangePasswordForm() {
             <button
                 type="submit"
                 disabled={saving}
-                className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-5 text-sm font-semibold text-[#031018] transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                className={buttonClasses({ variant: "primary", className: "px-5" })}
             >
                 {saving ? "Saving…" : "Update password"}
             </button>

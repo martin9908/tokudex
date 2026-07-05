@@ -1,12 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import { getGuestSeries } from "@/lib/guest";
-import tokudexIcon from "../../../assets/tokudex_icon.png";
+import { LinkButton, PosterImage } from "../atoms";
 
 function LockedTeaser() {
     const badges = ["First Steps", "Centurion", "Destroyer of Worlds", "Forever Red"];
     return (
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
+        <section className="relative overflow-hidden tdx-panel p-4 md:p-5">
             <div className="pointer-events-none select-none opacity-40 blur-[1px]">
                 <h2 className="text-2xl font-semibold mb-3">Achievements &amp; Trophies</h2>
                 <ul className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -23,12 +22,9 @@ function LockedTeaser() {
             </div>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#060b13]/40">
                 <p className="text-sm font-semibold text-cyan-50">Ranks, badges &amp; franchise trophies</p>
-                <Link
-                    href="/login"
-                    className="tdx-focus-ring inline-flex min-h-[40px] items-center rounded-xl bg-cyan-500/90 px-4 text-sm font-semibold text-[#031018] hover:bg-cyan-400 transition-colors"
-                >
+                <LinkButton href="/login" className="px-4">
                     Sign up to track &amp; earn
-                </Link>
+                </LinkButton>
             </div>
         </section>
     );
@@ -52,22 +48,16 @@ export default async function GuestHome() {
                     and earn achievements.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                        href="/login"
-                        className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-5 text-sm font-semibold text-[#031018] hover:bg-cyan-400 transition-colors"
-                    >
+                    <LinkButton href="/login" className="px-5">
                         Create free account
-                    </Link>
-                    <Link
-                        href="/login"
-                        className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl border border-cyan-900/60 px-5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/10 transition-colors"
-                    >
+                    </LinkButton>
+                    <LinkButton href="/login" variant="secondary" className="px-5">
                         Sign in
-                    </Link>
+                    </LinkButton>
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
+            <section className="tdx-panel p-4 md:p-5">
                 <h2 className="text-xl font-semibold mb-3">Latest series</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {series.map((s) => (
@@ -76,18 +66,13 @@ export default async function GuestHome() {
                             href={`/series/${s.id}`}
                             className="tdx-focus-ring group flex flex-col gap-3 rounded-xl border border-cyan-900/45 bg-[#081a2b]/70 p-3 hover:border-cyan-700/45 hover:bg-[#07182c]/80 transition-colors"
                         >
-                            <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-cyan-900/50 bg-[#091a2b] flex items-center justify-center">
-                                {s.cover_image_url ? (
-                                    <Image
-                                        src={s.cover_image_url}
-                                        alt={s.title}
-                                        fill
-                                        sizes="(max-width: 640px) 90vw, 320px"
-                                        className="object-cover"
-                                    />
-                                ) : (
-                                    <Image src={tokudexIcon} alt={s.title} className="w-16 h-16 opacity-80" />
-                                )}
+                            <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-cyan-900/50 bg-[#091a2b]">
+                                <PosterImage
+                                    src={s.cover_image_url}
+                                    alt={s.title}
+                                    sizes="(max-width: 640px) 90vw, 320px"
+                                    iconClassName="h-16 w-16 opacity-80"
+                                />
                             </div>
                             <div>
                                 <p className="text-[11px] tracking-[0.25em] text-cyan-200/70 uppercase mb-1">

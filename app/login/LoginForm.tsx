@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { buttonClasses } from "../components/atoms";
 
 type Action = (formData: FormData) => Promise<void>;
 type Mode = "signin" | "signup";
@@ -40,8 +41,7 @@ export default function LoginForm({
         });
     }
 
-    const inputClass =
-        "min-h-[44px] rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-2.5 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60";
+    const inputClass = "min-h-[44px] tdx-field px-3 py-2.5";
 
     function tabClass(tab: Mode) {
         return `min-h-[40px] rounded-lg text-sm font-semibold transition-colors ${
@@ -126,7 +126,7 @@ export default function LoginForm({
                     type="submit"
                     disabled={isPending}
                     aria-busy={isPending && active === mode}
-                    className="tdx-focus-ring mt-1 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-4 text-sm font-semibold text-[#031018] transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                    className={buttonClasses({ variant: "primary", className: "mt-1" })}
                 >
                     {mode === "signin"
                         ? isPending && active === "signin"
