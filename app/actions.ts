@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncAchievements } from "@/lib/achievementState";
+import { trackServer } from "@/lib/analytics";
 import { isUuid, PROGRESS_STATUSES, NOTE_MAX_LENGTH } from "@/lib/validation";
 
 type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
@@ -58,6 +59,11 @@ export async function setEpisodeProgress(seriesId: string, episode: number) {
 
     await syncAchievements();
 
+    await trackServer("log_episode", { seriesId, episode: current });
+    if (total && current >= total) {
+        await trackServer("mark_done", { seriesId });
+    }
+
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");
     revalidatePath("/");
@@ -94,6 +100,8 @@ export async function addSeriesToTracker(seriesId: string) {
     if (error) throw new Error(error.message);
 
     await syncAchievements();
+
+    await trackServer("add_to_tracker", { seriesId });
 
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");
@@ -172,6 +180,11 @@ export async function saveEpisodeCheckIn(
     }
 
     await syncAchievements();
+
+    await trackServer("log_episode", { seriesId, episode: current, status });
+    if (status === "completed") {
+        await trackServer("mark_done", { seriesId });
+    }
 
     revalidatePath(`/series/${seriesId}`);
     revalidatePath("/series");

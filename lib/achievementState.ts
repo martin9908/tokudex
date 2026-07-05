@@ -11,6 +11,7 @@ import {
     type CollectionAchievement,
 } from "./franchiseAchievements";
 import { getEarnedSeriesBadges, SERIES_BADGES } from "./seriesBadges";
+import { trackServer } from "./analytics";
 
 type ProgressRow = {
     current_episode: number | null;
@@ -105,10 +106,25 @@ export async function syncAchievements(): Promise<void> {
     if (earned.length === 0) return;
 
     const supabase = await createClient();
+
+    // Diff against what's already recorded so we emit an analytics event only
+    // for genuinely new unlocks (not on every progress mutation).
+    const { data: existing } = await supabase
+        .from("user_achievements")
+        .select("achievement_key")
+        .eq("user_id", loaded.userId);
+    const known = new Set(
+        (existing ?? []).map((r) => (r as { achievement_key: string }).achievement_key)
+    );
+
     const rows = earned.map((key) => ({ user_id: loaded.userId, achievement_key: key }));
     await supabase
         .from("user_achievements")
         .upsert(rows, { onConflict: "user_id,achievement_key", ignoreDuplicates: true });
+
+    for (const key of earned) {
+        if (!known.has(key)) await trackServer("achievement_earned", { key });
+    }
 }
 
 export type AchievementsView = {

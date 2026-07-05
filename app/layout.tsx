@@ -6,7 +6,9 @@ import "./globals.css";
 import Navbar from "./components/organisms/Navbar";
 import MobileTabBar from "./components/organisms/MobileTabBar";
 import AchievementToaster from "./components/organisms/AchievementToaster";
+import JsonLd from "./components/JsonLd";
 import { getEarnedAchievements } from "@/lib/achievementState";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, absoluteUrl } from "@/lib/seo";
 
 const bodyFont = Inter({
   variable: "--font-body",
@@ -19,9 +21,39 @@ const headingFont = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "TokuDex — Tokusatsu Episode Tracker",
-  description:
-    "Track which tokusatsu episode you're on and what happened last. TokuDex is an episode tracker — it does not stream video.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "TokuDex — Tokusatsu Episode Tracker",
+    template: "%s · TokuDex",
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "tokusatsu",
+    "Kamen Rider",
+    "Super Sentai",
+    "Ultraman",
+    "episode tracker",
+    "watch order",
+  ],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    url: SITE_URL,
+    title: "TokuDex — Tokusatsu Episode Tracker",
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TokuDex — Tokusatsu Episode Tracker",
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
 };
 
 export const viewport: Viewport = {
@@ -44,6 +76,15 @@ export default async function RootLayout({
       className={`${bodyFont.variable} ${headingFont.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: SITE_NAME,
+            url: SITE_URL,
+            logo: absoluteUrl("/logo.png"),
+          }}
+        />
         <Navbar />
         <main className="flex-1">{children}</main>
         <MobileTabBar />

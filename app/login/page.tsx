@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "../../lib/supabase/server";
+import { trackServer } from "@/lib/analytics";
 import LoginForm from "./LoginForm";
 
 async function getOrigin() {
@@ -35,6 +36,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             );
         }
 
+        await trackServer("login");
         redirect("/");
     }
 
@@ -60,6 +62,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             redirect(`/login?error=${encodeURIComponent(authError.message)}`);
         }
 
+        await trackServer("signup");
         redirect("/");
     }
 
