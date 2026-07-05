@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState, useEffect } from "react";
 import SeriesCard from "../components/molecules/SeriesCard";
-import tokudexIcon from "../../assets/tokudex_icon.png";
+import { LinkButton, PosterImage, ProgressBar } from "../components/atoms";
+import { watchedPercent } from "@/lib/progress";
 
 type Franchise = string;
 
@@ -107,11 +107,11 @@ function SeriesListContent() {
                     <div className="h-7 w-40 rounded-lg bg-cyan-900/45" />
                     <div className="h-4 w-80 rounded-lg bg-cyan-900/30 mt-2" />
                 </div>
-                <div className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 px-4 py-3 h-14" />
+                <div className="tdx-panel px-4 py-3 h-14" />
                 <div className="rounded-3xl border border-cyan-900/60 bg-[#050d17] h-64 md:h-80" />
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {Array.from({ length: 10 }).map((_, i) => (
-                        <div key={i} className="rounded-3xl border border-cyan-900/45 bg-[#0c1622]/75 aspect-[3/5]" />
+                        <div key={i} className="tdx-panel aspect-[3/5]" />
                     ))}
                 </div>
             </div>
@@ -134,14 +134,14 @@ function SeriesListContent() {
                     Browse the catalog and track your progress. TokuDex is an episode tracker — it doesn&apos;t stream episodes.
                 </p>
             </div>
-            <div className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl px-4 py-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="tdx-panel px-4 py-3 flex flex-col sm:flex-row gap-3 sm:items-center">
                 <div className="relative flex-1">
                     <input
                         type="search"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder="Search series..."
-                        className="w-full rounded-xl border border-cyan-900/50 bg-[#06111d]/90 pl-11 pr-3 py-3 text-sm text-cyan-50 placeholder:text-cyan-200/40 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                        className="tdx-field pl-11 pr-3 py-3"
                     />
                     <span
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300"
@@ -173,7 +173,7 @@ function SeriesListContent() {
                     onChange={(event) =>
                         setActiveFilter(event.target.value as "All" | Franchise)
                     }
-                    className="sm:w-56 rounded-xl border border-cyan-900/50 bg-[#06111d]/90 px-3 py-3 text-sm text-cyan-50 outline-none focus:ring-2 focus:ring-cyan-500/60"
+                    className="tdx-field sm:w-56 px-3 py-3"
                 >
                     {filters.map((filter) => (
                         <option key={filter} value={filter}>
@@ -191,20 +191,13 @@ function SeriesListContent() {
                             <div className="relative">
                                 <div className="absolute inset-0 rounded-2xl bg-cyan-400/20 blur-2xl" />
                                 <div className="relative h-[320px] w-[220px] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/70 shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
-                                    {featuredSeries.cover_image_url ? (
-                                        <Image
-                                            src={featuredSeries.cover_image_url}
-                                            alt={featuredSeries.title}
-                                            fill
-                                            sizes="220px"
-                                            className="object-cover object-center"
-                                        />
-                                    ) : (
-                                        <div className="flex h-full w-full items-center justify-center">
-                                            <Image src={tokudexIcon} alt="" className="w-24 h-24 opacity-80" />
-                                        </div>
-                                    )}
-                                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,9,19,0.06)_0%,rgba(2,9,19,0.3)_70%,rgba(2,9,19,0.52)_100%)]" />
+                                    <PosterImage
+                                        src={featuredSeries.cover_image_url}
+                                        alt={featuredSeries.title}
+                                        sizes="220px"
+                                        iconClassName="h-24 w-24 opacity-80"
+                                        overlay
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -265,25 +258,17 @@ function SeriesListContent() {
                                     <p className="text-xl text-cyan-50/70 mb-1">/ {featuredSeries.total_episodes || "?"}</p>
                                     <p className="text-cyan-100/70 mb-1">Episodes tracked in this series</p>
                                 </div>
-                                <div
-                                    role="progressbar"
-                                    aria-valuenow={Math.round((featuredProgress / (featuredSeries.total_episodes || 1)) * 100)}
-                                    aria-valuemin={0}
-                                    aria-valuemax={100}
-                                    aria-label={`${featuredProgress} of ${featuredSeries.total_episodes || "?"} episodes tracked`}
-                                    className="h-2 w-full rounded-full bg-cyan-950/80 overflow-hidden"
-                                >
-                                    <div
-                                        className="h-full"
-                                        style={{ background: "var(--accent-primary)", width: `${Math.round((featuredProgress / (featuredSeries.total_episodes || 1)) * 100)}%` }}
-                                    />
-                                </div>
+                                <ProgressBar
+                                    value={featuredProgress}
+                                    max={featuredSeries.total_episodes || 1}
+                                    label={`${featuredProgress} of ${featuredSeries.total_episodes || "?"} episodes tracked`}
+                                />
                             </div>
                         </div>
                     </section>
 
                     <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
-                        <article className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
+                        <article className="tdx-panel p-4 md:p-5">
                             <p className="text-cyan-100 text-lg font-semibold mb-4">
                                 Progress Overview
                             </p>
@@ -295,17 +280,20 @@ function SeriesListContent() {
                                     <p className="text-cyan-50/70 text-sm">
                                         of {featuredSeries.total_episodes || "?"} episodes tracked
                                     </p>
+                                    <ProgressBar
+                                        value={featuredProgress}
+                                        max={featuredSeries.total_episodes || 1}
+                                        label={`${watchedPercent(featuredProgress, featuredSeries.total_episodes)}% tracked`}
+                                        className="mt-2"
+                                    />
                                 </div>
-                                <Link
-                                    href={`/series/${featuredSeries.id}`}
-                                    className="inline-flex w-full justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-4 py-2 text-sm font-semibold transition-colors"
-                                >
+                                <LinkButton href={`/series/${featuredSeries.id}`} full>
                                     Open Tracker &gt;
-                                </Link>
+                                </LinkButton>
                             </div>
                         </article>
 
-                        <aside className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
+                        <aside className="tdx-panel p-4 md:p-5">
                             <p className="text-cyan-100 text-lg font-semibold mb-4">
                                 About The Series
                             </p>

@@ -4,6 +4,7 @@ import {
     getAchievements,
     countEarned,
 } from "@/lib/achievements";
+import { Badge, ProgressBar } from "../atoms";
 
 type AchievementsProps = {
     seriesTracked: number;
@@ -27,7 +28,7 @@ export default function Achievements({
         : 100;
 
     return (
-        <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
+        <section className="tdx-panel p-4 md:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
                     <h2 className="text-2xl font-semibold">Achievements</h2>
@@ -35,9 +36,7 @@ export default function Achievements({
                         View all
                     </Link>
                 </div>
-                <span className="rounded-full border border-cyan-600/40 bg-cyan-500/15 px-2.5 py-0.5 text-xs font-semibold text-cyan-200">
-                    {current.title}
-                </span>
+                <Badge variant="info" pill>{current.title}</Badge>
             </div>
 
             {next ? (
@@ -46,16 +45,7 @@ export default function Achievements({
                         <span>{earned}/{achievements.length} unlocked</span>
                         <span>{episodesLogged} / {next.min} eps → {next.title}</span>
                     </div>
-                    <div
-                        role="progressbar"
-                        aria-valuenow={rankPct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`${rankPct}% to ${next.title}`}
-                        className="h-1.5 w-full rounded-full bg-cyan-950/80 overflow-hidden"
-                    >
-                        <div className="h-full" style={{ width: `${rankPct}%`, background: "var(--accent-primary)" }} />
-                    </div>
+                    <ProgressBar value={rankPct} max={100} size="sm" label={`${rankPct}% to ${next.title}`} />
                 </div>
             ) : (
                 <p className="mb-4 text-xs text-cyan-200/70">

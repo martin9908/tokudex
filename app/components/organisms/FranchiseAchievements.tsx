@@ -1,5 +1,6 @@
 import { evaluateCollections, type CompletedSeries } from "@/lib/franchiseAchievements";
 import { badgeForSeries } from "@/lib/seriesBadges";
+import { ProgressBar } from "../atoms";
 
 export default function FranchiseAchievements({
     completed,
@@ -15,7 +16,7 @@ export default function FranchiseAchievements({
     });
 
     return (
-        <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
+        <section className="tdx-panel p-4 md:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
                 <h2 className="text-2xl font-semibold">Franchise Trophies</h2>
                 <span className="text-xs text-cyan-200/70">
@@ -41,19 +42,12 @@ export default function FranchiseAchievements({
                         <p className="mt-1 text-xs text-cyan-200/70">{c.description}</p>
                         {!c.earned && c.target > 1 && (
                             <div className="mt-2">
-                                <div
-                                    role="progressbar"
-                                    aria-valuenow={c.current}
-                                    aria-valuemin={0}
-                                    aria-valuemax={c.target}
-                                    aria-label={`${c.current} of ${c.target}`}
-                                    className="h-1 w-full rounded-full bg-cyan-950/80 overflow-hidden"
-                                >
-                                    <div
-                                        className="h-full"
-                                        style={{ width: `${Math.round((c.current / c.target) * 100)}%`, background: "var(--accent-primary)" }}
-                                    />
-                                </div>
+                                <ProgressBar
+                                    value={c.current}
+                                    max={c.target}
+                                    size="sm"
+                                    label={`${c.current} of ${c.target}`}
+                                />
                                 <p className="mt-1 text-[11px] text-cyan-300/70">
                                     {c.current}/{c.target}
                                 </p>

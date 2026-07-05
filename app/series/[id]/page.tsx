@@ -1,22 +1,23 @@
 import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import EpisodeList from "../../components/organisms/EpisodeList";
 import AddSeriesButton from "../../components/molecules/AddSeriesButton";
 import LogEpisodeButton from "../../components/organisms/LogEpisodeButton";
+import { LinkButton, PosterImage, ProgressBar, buttonClasses } from "../../components/atoms";
 import { statusBadgeClass, statusLabel } from "@/lib/status";
 import { getGuestSeriesIds } from "@/lib/guest";
-import tokudexIcon from "../../../assets/tokudex_icon.png";
 
 type SeriesDetailPageProps = {
     params: Promise<{ id: string }>;
 };
 
+const HERO_BACKDROP =
+    "bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),radial-gradient(circle_at_12%_82%,rgba(8,167,212,0.10),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]";
+
 export default async function SeriesDetailPage({ params }: SeriesDetailPageProps) {
     const { id } = await params;
     const client = await createClient();
 
-    // Get authenticated user
     const {
         data: { user },
     } = await client.auth.getUser();
@@ -66,9 +67,6 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
 
     const isTracking = !!progress;
     const currentEpisode = progress?.current_episode || 0;
-    const progressPercent = Math.round(
-        (currentEpisode / (series.total_episodes || 1)) * 100
-    );
     const nextEpisode = Math.min(currentEpisode + 1, series.total_episodes || 1);
     const hasNext = isTracking && (!series.total_episodes || currentEpisode < series.total_episodes);
     const nextEpisodeData = (episodes ?? []).find((e) => e.episode_number === nextEpisode);
@@ -77,27 +75,20 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
             <section className="relative overflow-hidden rounded-3xl border border-cyan-900/50 bg-[#05101d] min-h-[330px]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),radial-gradient(circle_at_12%_82%,rgba(8,167,212,0.10),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]" />
+                <div className={`absolute inset-0 ${HERO_BACKDROP}`} />
                 <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 md:grid-cols-[1fr_200px] lg:grid-cols-[1fr_220px] gap-6 md:gap-8 items-start">
                     {/* Poster — above the text on mobile, to the right on md+ */}
                     <div className="order-first md:order-last">
                         <div className="relative mx-auto w-[140px] sm:w-[160px] md:w-full md:max-w-[220px]">
                             <div className="absolute inset-0 rounded-2xl bg-cyan-400/15 blur-2xl" />
                             <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/75 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
-                                {series.cover_image_url ? (
-                                    <Image
-                                        src={series.cover_image_url}
-                                        alt={series.title}
-                                        fill
-                                        sizes="(max-width: 768px) 160px, 220px"
-                                        className="object-cover object-center"
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center p-4">
-                                        <Image src={tokudexIcon} alt="" className="w-20 h-20 opacity-85" />
-                                    </div>
-                                )}
-                                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,9,19,0.08)_0%,rgba(2,9,19,0.18)_60%,rgba(2,9,19,0.38)_100%)]" />
+                                <PosterImage
+                                    src={series.cover_image_url}
+                                    alt={series.title}
+                                    sizes="(max-width: 768px) 160px, 220px"
+                                    iconClassName="h-20 w-20 opacity-85"
+                                    overlay
+                                />
                             </div>
                         </div>
                     </div>
@@ -129,16 +120,12 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                         </div>
 
                         <div className="max-w-lg mb-5">
-                            <div
-                                role="progressbar"
-                                aria-valuenow={progressPercent}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-label={`${currentEpisode} of ${series.total_episodes || "?"} episodes tracked`}
-                                className="h-2 w-full rounded-full bg-cyan-950/85 overflow-hidden mb-1.5"
-                            >
-                                <div className="h-full" style={{ width: `${progressPercent}%`, background: "var(--accent-primary)" }} />
-                            </div>
+                            <ProgressBar
+                                value={currentEpisode}
+                                max={series.total_episodes || 1}
+                                label={`${currentEpisode} of ${series.total_episodes || "?"} episodes tracked`}
+                                className="mb-1.5"
+                            />
                             <p className="text-sm text-cyan-100/70">
                                 {currentEpisode} / {series.total_episodes || "?"} episodes tracked
                             </p>
@@ -153,7 +140,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                                         episodeNumber={nextEpisode}
                                         episodeTitle={nextEpisodeData?.title ?? null}
                                         episodeSynopsis={nextEpisodeData?.synopsis ?? null}
-                                        className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-5 text-sm font-semibold transition-colors"
+                                        className={buttonClasses({ variant: "primary", className: "px-5" })}
                                     />
                                 ) : (
                                     <span className="inline-flex min-h-[44px] items-center rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 text-sm font-medium text-emerald-200">
@@ -210,7 +197,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                 </section>
             )}
 
-            <section id="episode-list" className="scroll-mt-20 rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
+            <section id="episode-list" className="scroll-mt-20 tdx-panel p-4 md:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <h2 className="text-2xl font-semibold">Episode List</h2>
                     <p className="text-sm text-cyan-200/65">Tap an episode to log it in a popup</p>
@@ -261,19 +248,12 @@ function GuestSeriesDetail({
                     <div className="order-first md:order-last">
                         <div className="relative mx-auto w-[140px] sm:w-[160px] md:w-full md:max-w-[200px]">
                             <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/75">
-                                {series.cover_image_url ? (
-                                    <Image
-                                        src={series.cover_image_url}
-                                        alt={series.title}
-                                        fill
-                                        sizes="(max-width: 768px) 160px, 200px"
-                                        className="object-cover object-center"
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center p-4">
-                                        <Image src={tokudexIcon} alt="" className="w-16 h-16 opacity-85" />
-                                    </div>
-                                )}
+                                <PosterImage
+                                    src={series.cover_image_url}
+                                    alt={series.title}
+                                    sizes="(max-width: 768px) 160px, 200px"
+                                    iconClassName="h-16 w-16 opacity-85"
+                                />
                             </div>
                         </div>
                     </div>
@@ -300,12 +280,9 @@ function GuestSeriesDetail({
                             </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                                href="/login"
-                                className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-5 text-sm font-semibold text-[#031018] hover:bg-cyan-400 transition-colors"
-                            >
+                            <LinkButton href="/login" className="px-5">
                                 Sign up to track this series
-                            </Link>
+                            </LinkButton>
                             <a
                                 href="#episode-list"
                                 className="tdx-focus-ring rounded-lg text-sm text-cyan-300/85 hover:text-cyan-200"
@@ -317,7 +294,7 @@ function GuestSeriesDetail({
                 </div>
             </section>
 
-            <section id="episode-list" className="scroll-mt-20 rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 backdrop-blur-xl p-4 md:p-5">
+            <section id="episode-list" className="scroll-mt-20 tdx-panel p-4 md:p-5">
                 <h2 className="text-2xl font-semibold mb-4">Episode List</h2>
                 {series.total_episodes && series.total_episodes > 0 ? (
                     <EpisodeList
@@ -347,12 +324,9 @@ function LockedSeriesView({ title }: { title: string }) {
                 Guests can preview the latest series in each franchise. Create a free account to
                 browse the full catalog, track your progress, and earn achievements.
             </p>
-            <Link
-                href="/login"
-                className="tdx-focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cyan-500/90 px-5 text-sm font-semibold text-[#031018] hover:bg-cyan-400 transition-colors"
-            >
+            <LinkButton href="/login" className="px-5">
                 Create free account
-            </Link>
+            </LinkButton>
         </div>
     );
 }

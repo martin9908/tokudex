@@ -28,7 +28,7 @@ export default async function AccountPage() {
                 <p className="text-sm text-cyan-200/70 mt-1">Manage your TokuDex account.</p>
             </div>
 
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-5">
+            <section className="tdx-panel p-5">
                 <h2 className="text-lg font-semibold mb-3">Profile</h2>
                 <EditNameForm initialName={fullName ?? ""} />
                 <dl className="mt-4 text-sm">
@@ -42,7 +42,7 @@ export default async function AccountPage() {
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-5">
+            <section className="tdx-panel p-5">
                 <h2 className="text-lg font-semibold mb-3">Change password</h2>
                 <ChangePasswordForm />
             </section>

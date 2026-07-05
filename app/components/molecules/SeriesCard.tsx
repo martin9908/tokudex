@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
-import tokudexIcon from "../../../assets/tokudex_icon.png";
 import Badge from "../atoms/Badge";
 import ProgressBar from "../atoms/ProgressBar";
+import PosterImage from "../atoms/PosterImage";
+import MarkDoneButton from "./MarkDoneButton";
 
 type SeriesCardProps = {
     id: string;
@@ -25,39 +25,30 @@ export default function SeriesCard({
     thumbnailUrl,
     copyrightNotice,
 }: SeriesCardProps) {
-    const isComplete = watchedEpisodes === totalEpisodes;
+    const isComplete = totalEpisodes > 0 && watchedEpisodes >= totalEpisodes;
+    const canComplete = totalEpisodes > 0 && !isComplete;
 
     return (
-        <Link
-            href={`/series/${id}`}
-            className="tdx-focus-ring group flex h-full flex-col gap-3 rounded-3xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 hover:border-cyan-700/45 hover:bg-[#07182c]/80 transition-colors"
-        >
+        <article className="group relative flex h-full flex-col gap-3 rounded-3xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 transition-colors hover:border-cyan-700/45 hover:bg-[#07182c]/80">
             <div className="relative mx-auto aspect-[3/4] w-full max-w-[170px] shrink-0 overflow-hidden rounded-2xl border border-cyan-900/40 bg-[#10141f]">
-                {thumbnailUrl ? (
-                    <Image
-                        src={thumbnailUrl}
-                        alt={title}
-                        fill
-                        sizes="170px"
-                        className="scale-[1.03] object-cover object-[50%_30%]"
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                        <Image
-                            src={tokudexIcon}
-                            alt={title}
-                            className="h-16 w-16 opacity-75 transition-opacity group-hover:opacity-90"
-                        />
-                    </div>
-                )}
+                <PosterImage
+                    src={thumbnailUrl}
+                    alt={title}
+                    sizes="170px"
+                    imageClassName="scale-[1.03] object-cover object-[50%_30%]"
+                    iconClassName="h-16 w-16 opacity-75 transition-opacity group-hover:opacity-90"
+                />
             </div>
             <div className="flex flex-1 flex-col">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                    <span className="line-clamp-1 font-semibold text-xl leading-tight tracking-tight text-cyan-50/95">
+                    <Link
+                        href={`/series/${id}`}
+                        className="tdx-focus-ring line-clamp-1 font-semibold text-xl leading-tight tracking-tight text-cyan-50/95 after:absolute after:inset-0"
+                    >
                         {title}
-                    </span>
+                    </Link>
                     {isComplete && (
-                        <Badge variant="success" className="shrink-0">Complete</Badge>
+                        <Badge variant="success" className="relative z-10 shrink-0">Complete</Badge>
                     )}
                 </div>
                 <p className="text-sm text-cyan-100/85 mb-2">
@@ -77,6 +68,13 @@ export default function SeriesCard({
                         max={Math.max(totalEpisodes, 1)}
                         label={`${watchedEpisodes} of ${totalEpisodes} episodes watched`}
                     />
+                    {canComplete && (
+                        <MarkDoneButton
+                            seriesId={id}
+                            totalEpisodes={totalEpisodes}
+                            className="mt-3"
+                        />
+                    )}
                     {copyrightNotice && (
                         <p className="mt-3 text-[11px] text-cyan-200/45 line-clamp-1">
                             {copyrightNotice}
@@ -84,6 +82,6 @@ export default function SeriesCard({
                     )}
                 </div>
             </div>
-        </Link>
+        </article>
     );
 }

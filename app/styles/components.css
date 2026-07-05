@@ -29,6 +29,34 @@
     border-radius: var(--radius-xl);
   }
 
+  /* Translucent "glass" panel — the standard section surface across pages. */
+  .tdx-panel {
+    background: color-mix(in oklab, var(--surface) 75%, transparent);
+    border: 1px solid color-mix(in oklab, #164e63 45%, transparent);
+    border-radius: 1rem;
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  /* Shared form field styling for inputs, selects, and textareas. */
+  .tdx-field {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in oklab, #164e63 50%, transparent);
+    background: color-mix(in oklab, #06111d 90%, transparent);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    outline: none;
+  }
+
+  .tdx-field::placeholder {
+    color: color-mix(in oklab, var(--accent-primary) 40%, transparent);
+  }
+
+  .tdx-field:focus {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent-primary) 60%, transparent);
+  }
+
   .tdx-btn {
     min-height: var(--button-height);
     min-width: var(--touch-target-min);
