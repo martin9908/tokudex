@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import SignOutButton from "../components/SignOutButton";
-import SupportLink from "../components/SupportLink";
+import SignOutButton from "../components/molecules/SignOutButton";
+import SupportLink from "../components/molecules/SupportLink";
 import EditNameForm from "./EditNameForm";
 import ChangePasswordForm from "./ChangePasswordForm";
 import DeleteAccountButton from "./DeleteAccountButton";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addSeriesToTracker } from "../actions";
+import { addSeriesToTracker } from "../../actions";
 
 type AddSeriesButtonProps = {
     seriesId: string;

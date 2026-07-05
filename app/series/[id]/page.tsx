@@ -1,9 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
-import EpisodeList from "../../components/EpisodeList";
-import AddSeriesButton from "../../components/AddSeriesButton";
-import LogEpisodeButton from "../../components/LogEpisodeButton";
+import EpisodeList from "../../components/organisms/EpisodeList";
+import AddSeriesButton from "../../components/molecules/AddSeriesButton";
+import LogEpisodeButton from "../../components/organisms/LogEpisodeButton";
 import { statusBadgeClass, statusLabel } from "@/lib/status";
 import { getGuestSeriesIds } from "@/lib/guest";
 import tokudexIcon from "../../../assets/tokudex_icon.png";
@@ -137,7 +137,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                                 aria-label={`${currentEpisode} of ${series.total_episodes || "?"} episodes tracked`}
                                 className="h-2 w-full rounded-full bg-cyan-950/85 overflow-hidden mb-1.5"
                             >
-                                <div className="h-full bg-cyan-400" style={{ width: `${progressPercent}%` }} />
+                                <div className="h-full" style={{ width: `${progressPercent}%`, background: "var(--accent-primary)" }} />
                             </div>
                             <p className="text-sm text-cyan-100/70">
                                 {currentEpisode} / {series.total_episodes || "?"} episodes tracked

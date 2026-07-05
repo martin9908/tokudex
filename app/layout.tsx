@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import MobileTabBar from "./components/MobileTabBar";
-import AchievementToaster from "./components/AchievementToaster";
+import Navbar from "./components/organisms/Navbar";
+import MobileTabBar from "./components/organisms/MobileTabBar";
+import AchievementToaster from "./components/organisms/AchievementToaster";
 import { getEarnedAchievements } from "@/lib/achievementState";
 
 const bodyFont = Inter({
@@ -53,6 +54,7 @@ export default async function RootLayout({
           />
         )}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

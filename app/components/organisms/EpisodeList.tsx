@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import EpisodeCheckInModal from "./EpisodeCheckInModal";
-import { setEpisodeProgress } from "../actions";
+import { setEpisodeProgress } from "../../actions";
 
 type Episode = {
     episode_number: number;
@@ -33,6 +33,7 @@ export default function EpisodeList({
     const [openEpisode, setOpenEpisode] = useState<number | null>(null);
     const [pending, setPending] = useState<number | null>(null);
     const [bulkPending, setBulkPending] = useState(false);
+    const [confirmMarkAll, setConfirmMarkAll] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
     const nextRef = useRef<HTMLButtonElement>(null);
@@ -41,18 +42,9 @@ export default function EpisodeList({
         nextRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
-    // Bulk action: mark the whole series watched in one server round-trip. The
-    // action clamps to total_episodes and flips status to "completed". Reversible
-    // by unmarking episode 1 (which rewinds progress to zero).
     function markAll() {
-        if (
-            !window.confirm(
-                `Mark all ${totalEpisodes} episodes of ${seriesTitle} as watched?`
-            )
-        ) {
-            return;
-        }
         setBulkPending(true);
+        setConfirmMarkAll(false);
         setError(null);
         startTransition(async () => {
             try {
@@ -66,8 +58,6 @@ export default function EpisodeList({
         });
     }
 
-    // Quick action: mark watched up to this episode, or unmark it (rewind to the
-    // one before). Goes straight to the server — no recap modal.
     function quickMark(episodeNumber: number, watched: boolean) {
         const target = watched ? episodeNumber - 1 : episodeNumber;
         setPending(episodeNumber);
@@ -84,7 +74,6 @@ export default function EpisodeList({
         });
     }
 
-    // Index titles by episode number once, instead of a linear scan per row.
     const titlesByNumber = useMemo(() => {
         const map = new Map<number, string>();
         for (const entry of episodes) {
@@ -92,6 +81,7 @@ export default function EpisodeList({
         }
         return map;
     }, [episodes]);
+
     const synopsisByNumber = useMemo(() => {
         const map = new Map<number, string>();
         for (const entry of episodes) {
@@ -133,14 +123,37 @@ export default function EpisodeList({
                             Jump to Episode {currentEpisode + 1}
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={markAll}
-                        disabled={bulkPending}
-                        className="tdx-focus-ring rounded-lg border border-cyan-600/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 transition-colors"
-                    >
-                        {bulkPending ? "Marking…" : "✓ Mark all as watched"}
-                    </button>
+                    {confirmMarkAll ? (
+                        <div className="flex items-center gap-2 rounded-lg border border-warning/40 bg-[var(--warning)]/10 px-3 py-1.5">
+                            <span className="text-xs text-[var(--warning)]">
+                                Mark all {totalEpisodes} episodes as watched?
+                            </span>
+                            <button
+                                type="button"
+                                onClick={markAll}
+                                disabled={bulkPending}
+                                className="tdx-focus-ring rounded-md bg-[var(--warning)] px-2 py-0.5 text-xs font-semibold text-[#1a1000] hover:opacity-90 disabled:opacity-50 transition-opacity"
+                            >
+                                Confirm
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setConfirmMarkAll(false)}
+                                className="tdx-focus-ring rounded-md border border-cyan-900/60 px-2 py-0.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setConfirmMarkAll(true)}
+                            disabled={bulkPending}
+                            className="tdx-focus-ring rounded-lg border border-cyan-600/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 transition-colors"
+                        >
+                            {bulkPending ? "Marking…" : "Mark all as watched"}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -183,8 +196,12 @@ export default function EpisodeList({
                                             className="tdx-focus-ring block w-full rounded-lg text-left"
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm font-semibold text-cyan-100/95">
-                                                    {isWatched && "✓ "}
+                                                <span className="flex items-center gap-1.5 text-sm font-semibold text-cyan-100/95">
+                                                    {isWatched && (
+                                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden className="shrink-0 text-[var(--success)]">
+                                                            <path d="M2.5 8.5 6 12l7.5-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                        </svg>
+                                                    )}
                                                     Episode {episodeNumber}
                                                 </span>
                                                 <span className="text-xs text-cyan-200/75">
@@ -196,20 +213,32 @@ export default function EpisodeList({
                                                     {title}
                                                 </p>
                                             )}
-                                            <p className="mt-2 text-[11px] text-cyan-300/80">Log with recap →</p>
+                                            <p className="mt-2 flex items-center gap-1 text-[11px] text-cyan-300/80">
+                                                Log with recap
+                                                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden>
+                                                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            </p>
                                         </button>
                                         <div className="mt-2 flex justify-end border-t border-cyan-900/40 pt-2">
                                             <button
                                                 type="button"
                                                 onClick={() => quickMark(episodeNumber, isWatched)}
                                                 disabled={isPending}
-                                                className="tdx-focus-ring rounded-lg px-2 py-1 text-xs font-medium text-cyan-200/85 hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
+                                                className="tdx-focus-ring flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-cyan-200/85 hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
                                             >
-                                                {isPending
-                                                    ? "Saving…"
-                                                    : isWatched
-                                                        ? "Unmark"
-                                                        : "✓ Mark watched"}
+                                                {isPending ? (
+                                                    "Saving…"
+                                                ) : isWatched ? (
+                                                    "Unmark"
+                                                ) : (
+                                                    <>
+                                                        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
+                                                            <path d="M2.5 8.5 6 12l7.5-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                        </svg>
+                                                        Mark watched
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
                                     </>

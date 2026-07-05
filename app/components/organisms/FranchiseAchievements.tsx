@@ -27,19 +27,14 @@ export default function FranchiseAchievements({
                 {collections.map((c) => (
                     <li
                         key={c.key}
-                        className={`rounded-xl border p-3 ${
-                            c.earned
+                        className={`rounded-xl border p-3 ${c.earned
                                 ? "border-amber-400/45 bg-amber-400/10"
                                 : "border-cyan-900/45 bg-[#081a2b]/60"
-                        }`}
+                            }`}
                     >
                         <div className="flex items-center gap-2">
                             <span aria-hidden>{c.earned ? "🏆" : "🔒"}</span>
-                            <p
-                                className={`text-sm font-semibold ${
-                                    c.earned ? "text-amber-100" : "text-cyan-100/65"
-                                }`}
-                            >
+                            <p className={`text-sm font-semibold ${c.earned ? "text-amber-100" : "text-cyan-100/65"}`}>
                                 {c.title}
                             </p>
                         </div>
@@ -55,8 +50,8 @@ export default function FranchiseAchievements({
                                     className="h-1 w-full rounded-full bg-cyan-950/80 overflow-hidden"
                                 >
                                     <div
-                                        className="h-full bg-cyan-400"
-                                        style={{ width: `${Math.round((c.current / c.target) * 100)}%` }}
+                                        className="h-full"
+                                        style={{ width: `${Math.round((c.current / c.target) * 100)}%`, background: "var(--accent-primary)" }}
                                     />
                                 </div>
                                 <p className="mt-1 text-[11px] text-cyan-300/70">
@@ -77,11 +72,10 @@ export default function FranchiseAchievements({
                         {seriesChips.map((chip, i) => (
                             <span
                                 key={i}
-                                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                                    chip.themed
+                                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${chip.themed
                                         ? "border-amber-400/45 bg-amber-400/10 text-amber-100"
                                         : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                                }`}
+                                    }`}
                             >
                                 {chip.themed ? `🏅 ${chip.label}` : `✓ ${chip.label}`}
                             </span>

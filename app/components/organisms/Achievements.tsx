@@ -20,11 +20,10 @@ export default function Achievements({
     const achievements = getAchievements({ seriesTracked, episodesLogged, seriesCompleted });
     const earned = countEarned(achievements);
 
-    // Progress within the current rank band toward the next rank.
     const rankPct = next
         ? Math.round(
-              ((episodesLogged - current.min) / (next.min - current.min)) * 100
-          )
+            ((episodesLogged - current.min) / (next.min - current.min)) * 100
+        )
         : 100;
 
     return (
@@ -44,12 +43,8 @@ export default function Achievements({
             {next ? (
                 <div className="mb-4">
                     <div className="flex items-center justify-between text-xs text-cyan-200/70 mb-1">
-                        <span>
-                            {earned}/{achievements.length} unlocked
-                        </span>
-                        <span>
-                            {episodesLogged} / {next.min} eps → {next.title}
-                        </span>
+                        <span>{earned}/{achievements.length} unlocked</span>
+                        <span>{episodesLogged} / {next.min} eps → {next.title}</span>
                     </div>
                     <div
                         role="progressbar"
@@ -59,7 +54,7 @@ export default function Achievements({
                         aria-label={`${rankPct}% to ${next.title}`}
                         className="h-1.5 w-full rounded-full bg-cyan-950/80 overflow-hidden"
                     >
-                        <div className="h-full bg-cyan-400" style={{ width: `${rankPct}%` }} />
+                        <div className="h-full" style={{ width: `${rankPct}%`, background: "var(--accent-primary)" }} />
                     </div>
                 </div>
             ) : (
@@ -72,19 +67,14 @@ export default function Achievements({
                 {achievements.map((a) => (
                     <li
                         key={a.key}
-                        className={`rounded-xl border p-3 ${
-                            a.earned
+                        className={`rounded-xl border p-3 ${a.earned
                                 ? "border-cyan-500/45 bg-cyan-500/10"
                                 : "border-cyan-900/45 bg-[#081a2b]/60"
-                        }`}
+                            }`}
                     >
                         <div className="flex items-center gap-2 mb-1">
                             <span aria-hidden>{a.earned ? "🏅" : "🔒"}</span>
-                            <p
-                                className={`text-sm font-semibold ${
-                                    a.earned ? "text-cyan-100" : "text-cyan-100/60"
-                                }`}
-                            >
+                            <p className={`text-sm font-semibold ${a.earned ? "text-cyan-100" : "text-cyan-100/60"}`}>
                                 {a.label}
                             </p>
                         </div>

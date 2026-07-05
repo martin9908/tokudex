@@ -1,9 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "../../lib/supabase/server";
-import SignOutButton from "./SignOutButton";
-import tokudexLogo from "../../assets/tokudex_logo.png";
-import tokudexIcon from "../../assets/tokudex_icon.png";
+import { createClient } from "../../../lib/supabase/server";
+import SignOutButton from "../molecules/SignOutButton";
+import tokudexLogo from "../../../assets/tokudex_logo.png";
+import tokudexIcon from "../../../assets/tokudex_icon.png";
 
 export default async function Navbar() {
     const supabase = await createClient();
@@ -28,12 +28,7 @@ export default async function Navbar() {
 
                 <div className="hidden md:flex items-center gap-5 text-sm text-cyan-100/75">
                     <Link href="/" className="hover:text-cyan-300 transition-colors">Home</Link>
-                    <Link
-                        href="/series"
-                        className="hover:text-cyan-300 transition-colors"
-                    >
-                        Series
-                    </Link>
+                    <Link href="/series" className="hover:text-cyan-300 transition-colors">Series</Link>
                     {user && (
                         <Link href="/achievements" className="hover:text-cyan-300 transition-colors">
                             Achievements

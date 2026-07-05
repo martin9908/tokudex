@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { saveEpisodeCheckIn } from "../actions";
+import { saveEpisodeCheckIn } from "../../actions";
 import { NOTE_MAX_LENGTH } from "@/lib/validation";
 
 type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";

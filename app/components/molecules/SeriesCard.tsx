@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
-import tokudexIcon from "../../assets/tokudex_icon.png";
+import tokudexIcon from "../../../assets/tokudex_icon.png";
+import Badge from "../atoms/Badge";
+import ProgressBar from "../atoms/ProgressBar";
 
 type SeriesCardProps = {
     id: string;
@@ -23,7 +25,6 @@ export default function SeriesCard({
     thumbnailUrl,
     copyrightNotice,
 }: SeriesCardProps) {
-    const progress = Math.round((watchedEpisodes / Math.max(totalEpisodes, 1)) * 100);
     const isComplete = watchedEpisodes === totalEpisodes;
 
     return (
@@ -56,9 +57,7 @@ export default function SeriesCard({
                         {title}
                     </span>
                     {isComplete && (
-                        <span className="text-xs font-medium text-emerald-300 shrink-0">
-                            Complete
-                        </span>
+                        <Badge variant="success" className="shrink-0">Complete</Badge>
                     )}
                 </div>
                 <p className="text-sm text-cyan-100/85 mb-2">
@@ -73,19 +72,11 @@ export default function SeriesCard({
                     </p>
                 )}
                 <div className="mt-auto pt-2">
-                    <div
-                        role="progressbar"
-                        aria-valuenow={progress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`${watchedEpisodes} of ${totalEpisodes} episodes watched`}
-                        className="h-2 w-full rounded-full bg-cyan-950/75 overflow-hidden"
-                    >
-                        <div
-                            className="h-full rounded-full bg-cyan-300 transition-all"
-                            style={{ width: `${progress}%` }}
-                        />
-                    </div>
+                    <ProgressBar
+                        value={watchedEpisodes}
+                        max={Math.max(totalEpisodes, 1)}
+                        label={`${watchedEpisodes} of ${totalEpisodes} episodes watched`}
+                    />
                     {copyrightNotice && (
                         <p className="mt-3 text-[11px] text-cyan-200/45 line-clamp-1">
                             {copyrightNotice}

@@ -14,7 +14,6 @@ export default function AchievementToaster({
     labels: Record<string, string>;
 }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
-    // Depend on a stable string so the effect only reacts to real changes.
     const earnedKey = earned.join("|");
 
     useEffect(() => {
@@ -26,28 +25,22 @@ export default function AchievementToaster({
             stored = null;
         }
 
-        // First load on this device: seed silently so we don't toast everything
-        // the user already earned before this feature existed.
         if (stored === null) {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(earned));
-            } catch {}
+            } catch { }
             return;
         }
 
         const storedSet = new Set(stored);
         const fresh = earned.filter((k) => !storedSet.has(k));
 
-        // Persist the current set either way (also drops un-earned keys so they
-        // can toast again if re-earned).
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(earned));
-        } catch {}
+        } catch { }
 
         if (fresh.length) {
             const base = Date.now();
-            // Queuing toasts is the intended response to new server data detected
-            // via the localStorage diff (which can only run in an effect).
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setToasts((prev) => [
                 ...prev,

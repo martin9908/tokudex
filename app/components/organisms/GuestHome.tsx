@@ -1,9 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getGuestSeries } from "@/lib/guest";
-import tokudexIcon from "../../assets/tokudex_icon.png";
+import tokudexIcon from "../../../assets/tokudex_icon.png";
 
-// A locked/grayed gamification teaser — shows guests what they'd unlock.
 function LockedTeaser() {
     const badges = ["First Steps", "Centurion", "Destroyer of Worlds", "Forever Red"];
     return (
@@ -40,7 +39,6 @@ export default async function GuestHome() {
 
     return (
         <div className="max-w-[1100px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 space-y-4">
-            {/* Guest banner */}
             <section className="rounded-2xl border border-cyan-600/40 bg-cyan-500/[0.07] p-5 md:p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300/80 mb-1">
                     Browsing as a guest
@@ -69,7 +67,6 @@ export default async function GuestHome() {
                 </div>
             </section>
 
-            {/* Latest series preview */}
             <section className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 p-4 md:p-5">
                 <h2 className="text-xl font-semibold mb-3">Latest series</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

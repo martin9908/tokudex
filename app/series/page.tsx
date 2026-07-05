@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState, useEffect } from "react";
-import SeriesCard from "../components/SeriesCard";
+import SeriesCard from "../components/molecules/SeriesCard";
 import tokudexIcon from "../../assets/tokudex_icon.png";
 
 type Franchise = string;
@@ -102,8 +102,18 @@ function SeriesListContent() {
 
     if (loading) {
         return (
-            <div className="max-w-6xl mx-auto px-4 py-6 w-full">
-                <p className="text-cyan-200/70">Loading series...</p>
+            <div className="max-w-6xl mx-auto px-4 py-6 pb-24 md:pb-10 w-full space-y-5 animate-pulse">
+                <div>
+                    <div className="h-7 w-40 rounded-lg bg-cyan-900/45" />
+                    <div className="h-4 w-80 rounded-lg bg-cyan-900/30 mt-2" />
+                </div>
+                <div className="rounded-2xl border border-cyan-900/45 bg-[#0c1622]/75 px-4 py-3 h-14" />
+                <div className="rounded-3xl border border-cyan-900/60 bg-[#050d17] h-64 md:h-80" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                        <div key={i} className="rounded-3xl border border-cyan-900/45 bg-[#0c1622]/75 aspect-[3/5]" />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -264,7 +274,8 @@ function SeriesListContent() {
                                     className="h-2 w-full rounded-full bg-cyan-950/80 overflow-hidden"
                                 >
                                     <div
-                                        className="h-full bg-[linear-gradient(90deg,#09d4ff_0%,#09d4ff_82%,#123046_82%)]"
+                                        className="h-full"
+                                        style={{ background: "var(--accent-primary)" }}
                                         style={{ width: `${Math.round((featuredProgress / (featuredSeries.total_episodes || 1)) * 100)}%` }}
                                     />
                                 </div>
