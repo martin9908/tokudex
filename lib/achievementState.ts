@@ -12,6 +12,7 @@ import {
 } from "./franchiseAchievements";
 import { getEarnedSeriesBadges, SERIES_BADGES } from "./seriesBadges";
 import { trackServer } from "./analytics";
+import { getReferralCount } from "./referrals";
 
 type ProgressRow = {
     current_episode: number | null;
@@ -24,6 +25,7 @@ type ProgressTotals = {
     episodesLogged: number;
     seriesCompleted: number;
     completed: CompletedSeries[];
+    referralCount: number;
 };
 
 // Loads + reduces the signed-in user's progress. Returns null when logged out.
@@ -52,6 +54,7 @@ async function loadProgress(): Promise<{ userId: string; totals: ProgressTotals 
                 title: r.series!.title,
                 franchise: r.series!.franchise,
             })),
+            referralCount: await getReferralCount(user.id),
         },
     };
 }
@@ -59,7 +62,7 @@ async function loadProgress(): Promise<{ userId: string; totals: ProgressTotals 
 // Stable earned keys (+ labels) for everything currently earned. Used by the
 // global toaster and by syncAchievements.
 function deriveEarned(totals: ProgressTotals): { earned: string[]; labels: Record<string, string> } {
-    const { seriesTracked, episodesLogged, seriesCompleted, completed } = totals;
+    const { seriesTracked, episodesLogged, seriesCompleted, completed, referralCount } = totals;
     const earned: string[] = [];
     const labels: Record<string, string> = {};
 
@@ -68,7 +71,7 @@ function deriveEarned(totals: ProgressTotals): { earned: string[]; labels: Recor
     earned.push(rankKey);
     labels[rankKey] = `New rank: ${current.title}`;
 
-    for (const a of getAchievements({ seriesTracked, episodesLogged, seriesCompleted })) {
+    for (const a of getAchievements({ seriesTracked, episodesLogged, seriesCompleted, referralCount })) {
         if (a.earned) {
             earned.push(`ach-${a.key}`);
             labels[`ach-${a.key}`] = a.label;
@@ -142,10 +145,10 @@ export type AchievementsView = {
 export async function getAchievementsView(): Promise<AchievementsView | null> {
     const loaded = await loadProgress();
     if (!loaded) return null;
-    const { seriesTracked, episodesLogged, seriesCompleted, completed } = loaded.totals;
+    const { seriesTracked, episodesLogged, seriesCompleted, completed, referralCount } = loaded.totals;
 
     const { current, next } = getRank(episodesLogged);
-    const milestones = getAchievements({ seriesTracked, episodesLogged, seriesCompleted });
+    const milestones = getAchievements({ seriesTracked, episodesLogged, seriesCompleted, referralCount });
     const collections = evaluateCollections(completed);
 
     const earnedBadgeKeys = new Set(

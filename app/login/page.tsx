@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createClient } from "../../lib/supabase/server";
 import { trackServer } from "@/lib/analytics";
+import { attributeReferral } from "@/lib/referrals";
 import LoginForm from "./LoginForm";
 
 async function getOrigin() {
@@ -60,6 +61,24 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         if (authError) {
             redirect(`/login?error=${encodeURIComponent(authError.message)}`);
+        }
+
+        // Attribute the signup to a referrer if they arrived via an invite link.
+        const jar = await cookies();
+        const ref = jar.get("tdx_ref")?.value;
+        if (ref) {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+            if (user) {
+                try {
+                    await attributeReferral(user.id, ref);
+                    await trackServer("referral_signup");
+                } catch {
+                    // Attribution is best-effort; never block signup.
+                }
+                jar.delete("tdx_ref");
+            }
         }
 
         await trackServer("signup");

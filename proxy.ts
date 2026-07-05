@@ -55,6 +55,18 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
+    // Capture a referral code (?ref=CODE) so signup can attribute it. Runs on the
+    // public landing pages (/, /login), before auth is required.
+    const ref = request.nextUrl.searchParams.get("ref");
+    if (ref) {
+        supabaseResponse.cookies.set("tdx_ref", ref.slice(0, 32), {
+            maxAge: 60 * 60 * 24 * 30,
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+        });
+    }
+
     return supabaseResponse;
 }
 

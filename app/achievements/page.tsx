@@ -45,9 +45,14 @@ export default async function AchievementsPage() {
                         {earnedCount}/{totalCount} unlocked
                     </p>
                 </div>
-                <Link href="/" className="text-sm text-cyan-300 hover:text-cyan-200">
-                    ← Home
-                </Link>
+                <div className="flex items-center gap-4">
+                    <Link href="/invite" className="text-sm text-cyan-300 hover:text-cyan-200">
+                        Invite friends
+                    </Link>
+                    <Link href="/" className="text-sm text-cyan-300 hover:text-cyan-200">
+                        ← Home
+                    </Link>
+                </div>
             </div>
 
             {/* Rank */}
