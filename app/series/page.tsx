@@ -275,8 +275,7 @@ function SeriesListContent() {
                                 >
                                     <div
                                         className="h-full"
-                                        style={{ background: "var(--accent-primary)" }}
-                                        style={{ width: `${Math.round((featuredProgress / (featuredSeries.total_episodes || 1)) * 100)}%` }}
+                                        style={{ background: "var(--accent-primary)", width: `${Math.round((featuredProgress / (featuredSeries.total_episodes || 1)) * 100)}%` }}
                                     />
                                 </div>
                             </div>
