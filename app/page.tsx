@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProgressBySeries } from "@/lib/supabase/queries";
+import { getReferralCount } from "@/lib/referrals";
 import { toWatchItems, summarizeProgress, watchedPercent, type WatchItem } from "@/lib/progress";
 import { LinkButton, PosterImage, ProgressBar, buttonClasses } from "./components/atoms";
 import LogEpisodeButton from "./components/organisms/LogEpisodeButton";
@@ -8,6 +9,23 @@ import SupportBanner from "./components/molecules/SupportBanner";
 import Achievements from "./components/organisms/Achievements";
 import FranchiseAchievements from "./components/organisms/FranchiseAchievements";
 import GuestHome from "./components/organisms/GuestHome";
+import JsonLd from "./components/JsonLd";
+import { SITE_URL, SITE_NAME, absoluteUrl } from "@/lib/seo";
+
+const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_NAME,
+    url: SITE_URL,
+    potentialAction: {
+        "@type": "SearchAction",
+        target: {
+            "@type": "EntryPoint",
+            urlTemplate: absoluteUrl("/series?q={search_term_string}"),
+        },
+        "query-input": "required name=search_term_string",
+    },
+};
 
 export default async function Home() {
     const client = await createClient();
@@ -18,7 +36,12 @@ export default async function Home() {
 
     // Guests (no account) get a read-only preview instead of the tracker home.
     if (!user) {
-        return <GuestHome />;
+        return (
+            <>
+                <JsonLd data={websiteJsonLd} />
+                <GuestHome />
+            </>
+        );
     }
 
     const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
@@ -58,8 +81,11 @@ export default async function Home() {
         .filter((item) => item.progress.status === "completed")
         .map((item) => ({ title: item.series.title, franchise: item.series.franchise }));
 
+    const referralCount = await getReferralCount(user.id);
+
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10">
+            <JsonLd data={websiteJsonLd} />
             <main className="space-y-4">
                 <section className="tdx-panel p-4 md:p-5">
                     <div className="flex items-start justify-between gap-3 mb-4">
@@ -253,6 +279,7 @@ export default async function Home() {
                             seriesTracked={totalTracked}
                             episodesLogged={episodesLogged}
                             seriesCompleted={stats.completed}
+                            referralCount={referralCount}
                         />
 
                         <FranchiseAchievements completed={completedSeries} />

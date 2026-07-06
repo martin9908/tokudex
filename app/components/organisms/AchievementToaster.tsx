@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ShareButton from "../molecules/ShareButton";
 
 const STORAGE_KEY = "tokudex.earnedAchievements";
 
-type Toast = { id: number; text: string };
+type Toast = { id: number; text: string; achievementKey: string };
 
 export default function AchievementToaster({
     earned,
@@ -44,7 +45,7 @@ export default function AchievementToaster({
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setToasts((prev) => [
                 ...prev,
-                ...fresh.map((k, i) => ({ id: base + i, text: labels[k] ?? k })),
+                ...fresh.map((k, i) => ({ id: base + i, text: labels[k] ?? k, achievementKey: k })),
             ]);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,26 +68,38 @@ export default function AchievementToaster({
 
 function AchievementToast({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     useEffect(() => {
-        const timer = setTimeout(onDone, 5000);
+        // Longer than the plain toast so there's time to hit Share.
+        const timer = setTimeout(onDone, 10000);
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
-        <button
-            type="button"
-            onClick={onDone}
-            className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-xl border border-amber-400/45 bg-[#12202f] px-4 py-3 text-left shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
+        <div
+            role="status"
+            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-amber-400/45 bg-[#12202f] px-4 py-3 text-left shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
         >
             <span className="text-xl" aria-hidden>
                 🏆
             </span>
-            <span>
+            <div className="min-w-0 flex-1">
                 <span className="block text-[11px] uppercase tracking-wider text-amber-300/80">
                     Achievement unlocked
                 </span>
-                <span className="block text-sm font-semibold text-cyan-50">{toast.text}</span>
-            </span>
-        </button>
+                <span className="mb-2 block text-sm font-semibold text-cyan-50">{toast.text}</span>
+                <ShareButton
+                    shareKey={toast.achievementKey}
+                    text={`I unlocked "${toast.text}" on TokuDex!`}
+                />
+            </div>
+            <button
+                type="button"
+                onClick={onDone}
+                aria-label="Dismiss"
+                className="tdx-focus-ring shrink-0 rounded text-lg leading-none text-cyan-300/70 hover:text-cyan-100"
+            >
+                ×
+            </button>
+        </div>
     );
 }

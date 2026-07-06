@@ -10,15 +10,17 @@ type AchievementsProps = {
     seriesTracked: number;
     episodesLogged: number;
     seriesCompleted: number;
+    referralCount?: number;
 };
 
 export default function Achievements({
     seriesTracked,
     episodesLogged,
     seriesCompleted,
+    referralCount = 0,
 }: AchievementsProps) {
     const { current, next } = getRank(episodesLogged);
-    const achievements = getAchievements({ seriesTracked, episodesLogged, seriesCompleted });
+    const achievements = getAchievements({ seriesTracked, episodesLogged, seriesCompleted, referralCount });
     const earned = countEarned(achievements);
 
     const rankPct = next

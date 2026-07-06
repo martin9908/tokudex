@@ -6,6 +6,7 @@ import SupportLink from "../components/molecules/SupportLink";
 import EditNameForm from "./EditNameForm";
 import ChangePasswordForm from "./ChangePasswordForm";
 import DeleteAccountButton from "./DeleteAccountButton";
+import { LinkButton } from "../components/atoms";
 
 export const metadata = {
     title: "Account — TokuDex",
@@ -45,6 +46,14 @@ export default async function AccountPage() {
             <section className="tdx-panel p-5">
                 <h2 className="text-lg font-semibold mb-3">Change password</h2>
                 <ChangePasswordForm />
+            </section>
+
+            <section className="tdx-panel p-5">
+                <h2 className="text-lg font-semibold mb-1">Invite friends</h2>
+                <p className="text-sm text-cyan-200/70 mb-3">
+                    Share TokuDex and earn the Recruiter badge when a friend joins.
+                </p>
+                <LinkButton href="/invite" className="px-4">Get your invite link</LinkButton>
             </section>
 
             <section className="rounded-2xl border border-red-900/45 bg-red-500/5 p-5">

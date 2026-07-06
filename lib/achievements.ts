@@ -7,6 +7,7 @@ export type AchievementInput = {
     seriesTracked: number;
     episodesLogged: number;
     seriesCompleted: number;
+    referralCount?: number;
 };
 
 export type Rank = { title: string; min: number };
@@ -44,7 +45,7 @@ export type Achievement = {
 };
 
 export function getAchievements(input: AchievementInput): Achievement[] {
-    const { seriesTracked, episodesLogged, seriesCompleted } = input;
+    const { seriesTracked, episodesLogged, seriesCompleted, referralCount = 0 } = input;
 
     const make = (
         key: string,
@@ -69,6 +70,8 @@ export function getAchievements(input: AchievementInput): Achievement[] {
         make("log-100", "Centurion", "Log 100 episodes", episodesLogged, 100),
         make("complete-3", "Triple Threat", "Finish 3 series", seriesCompleted, 3),
         make("log-500", "Marathon", "Log 500 episodes", episodesLogged, 500),
+        make("recruit-1", "Recruiter", "Invite a friend who joins", referralCount, 1),
+        make("recruit-3", "Ambassador", "Invite 3 friends who join", referralCount, 3),
     ];
 }
 

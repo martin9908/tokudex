@@ -1,15 +1,99 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import EpisodeList from "../../components/organisms/EpisodeList";
 import AddSeriesButton from "../../components/molecules/AddSeriesButton";
 import LogEpisodeButton from "../../components/organisms/LogEpisodeButton";
+import JsonLd from "../../components/JsonLd";
 import { LinkButton, PosterImage, ProgressBar, buttonClasses } from "../../components/atoms";
 import { statusBadgeClass, statusLabel } from "@/lib/status";
-import { getGuestSeriesIds } from "@/lib/guest";
+import { getSeriesById } from "@/lib/supabase/queries";
+import {
+    SITE_NAME,
+    absoluteUrl,
+    seriesPath,
+    seriesUrl,
+    seriesMetaDescription,
+    truncateDescription,
+} from "@/lib/seo";
 
 type SeriesDetailPageProps = {
     params: Promise<{ id: string }>;
 };
+
+export async function generateMetadata({ params }: SeriesDetailPageProps): Promise<Metadata> {
+    const { id } = await params;
+    let series: Awaited<ReturnType<typeof getSeriesById>> | null = null;
+    try {
+        series = await getSeriesById(id);
+    } catch {
+        series = null;
+    }
+
+    if (!series) {
+        return { title: "Series not found", robots: { index: false, follow: false } };
+    }
+
+    const description = seriesMetaDescription(series);
+    const canonical = seriesPath(id);
+    return {
+        title: series.title,
+        description,
+        alternates: { canonical },
+        openGraph: {
+            type: "video.tv_show",
+            title: `${series.title} · ${SITE_NAME}`,
+            description,
+            url: seriesUrl(id),
+        },
+        twitter: { card: "summary_large_image", title: series.title, description },
+    };
+}
+
+// Builds schema.org structured data for a series (shared by guest + member views).
+function seriesJsonLd(
+    series: {
+        id: string;
+        title: string;
+        synopsis: string | null;
+        franchise: string | null;
+        total_episodes: number | null;
+        cover_image_url: string | null;
+    },
+    episodes: { episode_number: number; title: string | null }[]
+) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "TVSeries",
+        name: series.title,
+        description: truncateDescription(series.synopsis) || undefined,
+        image: series.cover_image_url || undefined,
+        genre: series.franchise || undefined,
+        numberOfEpisodes: series.total_episodes || undefined,
+        url: seriesUrl(series.id),
+        ...(episodes.length
+            ? {
+                  episode: episodes.slice(0, 100).map((e) => ({
+                      "@type": "TVEpisode",
+                      episodeNumber: e.episode_number,
+                      name: e.title || `Episode ${e.episode_number}`,
+                  })),
+              }
+            : {}),
+    };
+}
+
+function breadcrumbJsonLd(title: string, id: string) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+            { "@type": "ListItem", position: 2, name: "Series Library", item: absoluteUrl("/series") },
+            { "@type": "ListItem", position: 3, name: title, item: seriesUrl(id) },
+        ],
+    };
+}
 
 const HERO_BACKDROP =
     "bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),radial-gradient(circle_at_12%_82%,rgba(8,167,212,0.10),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]";
@@ -50,10 +134,9 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
         .eq("series_id", id)
         .order("episode_number", { ascending: true });
 
-    // Guests may view only the latest series per franchise, read-only.
+    // Series + episodes are public catalog data — guests get the full read-only
+    // view (crawlable for SEO). Tracking actions stay in the authed branch below.
     if (!user) {
-        const guestIds = await getGuestSeriesIds();
-        if (!guestIds.has(id)) return <LockedSeriesView title={series.title} />;
         return <GuestSeriesDetail series={series} episodes={episodes ?? []} />;
     }
 
@@ -74,6 +157,8 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
 
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
+            <JsonLd data={seriesJsonLd(series, episodes ?? [])} />
+            <JsonLd data={breadcrumbJsonLd(series.title, series.id)} />
             <section className="relative overflow-hidden rounded-3xl border border-cyan-900/50 bg-[#05101d] min-h-[330px]">
                 <div className={`absolute inset-0 ${HERO_BACKDROP}`} />
                 <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 md:grid-cols-[1fr_200px] lg:grid-cols-[1fr_220px] gap-6 md:gap-8 items-start">
@@ -242,6 +327,8 @@ function GuestSeriesDetail({
 }) {
     return (
         <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
+            <JsonLd data={seriesJsonLd(series, episodes)} />
+            <JsonLd data={breadcrumbJsonLd(series.title, series.id)} />
             <section className="relative overflow-hidden rounded-3xl border border-cyan-900/50 bg-[#05101d] min-h-[280px]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]" />
                 <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 md:grid-cols-[1fr_200px] gap-6 md:gap-8 items-start">
@@ -315,18 +402,3 @@ function GuestSeriesDetail({
     );
 }
 
-function LockedSeriesView({ title }: { title: string }) {
-    return (
-        <div className="max-w-2xl mx-auto px-4 py-16 w-full text-center">
-            <p className="text-4xl mb-3" aria-hidden>🔒</p>
-            <h1 className="text-2xl font-bold tracking-tight mb-2">{title} is members-only</h1>
-            <p className="text-sm text-cyan-200/70 mb-6">
-                Guests can preview the latest series in each franchise. Create a free account to
-                browse the full catalog, track your progress, and earn achievements.
-            </p>
-            <LinkButton href="/login" className="px-5">
-                Create free account
-            </LinkButton>
-        </div>
-    );
-}
