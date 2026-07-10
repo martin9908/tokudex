@@ -1,3 +1,4 @@
+// List of organisms components that are used in the application
 export { default as Navbar } from "./Navbar";
 export { default as MobileTabBar } from "./MobileTabBar";
 export { default as EpisodeList } from "./EpisodeList";
