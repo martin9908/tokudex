@@ -61,7 +61,8 @@ export async function proxy(request: NextRequest) {
     if (ref) {
         supabaseResponse.cookies.set("tdx_ref", ref.slice(0, 32), {
             maxAge: 60 * 60 * 24 * 30,
-            httpOnly: true,
+            httpOnly: true,                              // not readable by JS
+            secure: process.env.NODE_ENV === "production", // HTTPS-only in prod
             sameSite: "lax",
             path: "/",
         });
