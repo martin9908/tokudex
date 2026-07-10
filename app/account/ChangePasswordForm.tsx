@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { validatePasswordStrength } from "@/lib/validation";
 import { buttonClasses } from "../components/atoms";
 
 export default function ChangePasswordForm() {
@@ -18,8 +19,9 @@ export default function ChangePasswordForm() {
         setError(null);
         setDone(false);
 
-        if (password.length < 8) {
-            setError("Use at least 8 characters.");
+        const pwError = validatePasswordStrength(password);
+        if (pwError) {
+            setError(pwError);
             return;
         }
         if (password !== confirm) {

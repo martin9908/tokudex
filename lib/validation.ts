@@ -20,12 +20,41 @@ export const PROGRESS_STATUSES = [
 export type ProgressStatus = (typeof PROGRESS_STATUSES)[number];
 
 export const NOTE_MAX_LENGTH = 5000;
+export const PASSWORD_MIN_LENGTH = 12;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// RFC 5322-inspired pattern — rejects obvious non-emails without being overly strict.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
+}
+
+export function isValidEmail(value: unknown): value is string {
+  return typeof value === "string" && EMAIL_RE.test(value) && value.length <= 254;
+}
+
+/**
+ * Returns an error string if the password is too weak, or null if it passes.
+ * Requirements: at least PASSWORD_MIN_LENGTH chars, at least one uppercase
+ * letter, one lowercase letter, and one digit.
+ */
+export function validatePasswordStrength(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Password must contain at least one uppercase letter.";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Password must contain at least one lowercase letter.";
+  }
+  if (!/[0-9]/.test(password)) {
+    return "Password must contain at least one number.";
+  }
+  return null;
 }
 
 function isInteger(value: unknown): value is number {

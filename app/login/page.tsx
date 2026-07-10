@@ -4,6 +4,7 @@ import { headers, cookies } from "next/headers";
 import { createClient } from "../../lib/supabase/server";
 import { trackServer } from "@/lib/analytics";
 import { attributeReferral } from "@/lib/referrals";
+import { isValidEmail, validatePasswordStrength } from "@/lib/validation";
 import LoginForm from "./LoginForm";
 
 async function getOrigin() {
@@ -24,6 +25,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         "use server";
         const email = formData.get("email") as string;
         const password = formData.get("password") as string;
+
+        if (!isValidEmail(email)) {
+            redirect(`/login?error=${encodeURIComponent("Invalid email address.")}`);
+        }
+        if (!password || password.length < 1) {
+            redirect(`/login?error=${encodeURIComponent("Password is required.")}`);
+        }
 
         const supabase = await createClient();
         const { error: authError } = await supabase.auth.signInWithPassword({
@@ -46,6 +54,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         const email = formData.get("email") as string;
         const password = formData.get("password") as string;
         const fullName = (formData.get("name") as string | null)?.trim();
+
+        if (!isValidEmail(email)) {
+            redirect(`/login?error=${encodeURIComponent("Invalid email address.")}`);
+        }
+        const pwError = validatePasswordStrength(password);
+        if (pwError) {
+            redirect(`/login?error=${encodeURIComponent(pwError)}`);
+        }
 
         const supabase = await createClient();
         // Email confirmation is disabled in Supabase for the soft launch, so a
