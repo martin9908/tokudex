@@ -225,6 +225,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailPageProps
                                         episodeNumber={nextEpisode}
                                         episodeTitle={nextEpisodeData?.title ?? null}
                                         episodeSynopsis={nextEpisodeData?.synopsis ?? null}
+                                        episodeType={nextEpisodeData?.episode_type ?? null}
                                         className={buttonClasses({ variant: "primary", className: "px-5" })}
                                     />
                                 ) : (
@@ -315,7 +316,12 @@ type GuestDetailSeries = {
     original_run: string | null;
 };
 
-type GuestEpisode = { episode_number: number; title: string | null; synopsis: string | null };
+type GuestEpisode = {
+    episode_number: number;
+    title: string | null;
+    synopsis: string | null;
+    episode_type?: string | null;
+};
 
 // Read-only series view for guests (latest-per-franchise series only).
 function GuestSeriesDetail({

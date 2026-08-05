@@ -55,6 +55,9 @@ before `create policy`, as the RLS migration does) so they survive re-runs and
 - `*_enable_rls_policies.sql` — enables RLS on all four tables; `series`/`episodes`
   are public-read, `user_series_progress`/`episode_notes` are owner-only
   (`auth.uid() = user_id`). Verification queries are in the file's footer.
+- `*_episode_type.sql` — adds the optional `episodes.episode_type` tag
+  (`filler` | `clip_show` | `recap` | `special` | `crossover`; NULL = regular
+  episode). Presentation only — it does not change progress math.
 
 ## Required environment variables
 
@@ -81,14 +84,24 @@ from the Supabase dashboard, the **service role** key, or `supabase/seed.sql`
 - `series.synopsis` is the short series description.
 - `episode_notes` is the *user's* private recap (written via the check-in modal) —
   separate from the catalog synopsis.
+- `episodes.episode_type` optionally tags an episode as `filler`, `clip_show`,
+  `recap`, `special` or `crossover` (NULL = a regular story episode). The episode
+  list badges tagged episodes and offers a "hide filler & clip shows" toggle.
+  **Tag from a source, not from vibes** — whether an episode is filler is a claim
+  about the show, so check a guide/Fandom episode list before tagging.
 
 `seed.sql` has copy-paste-able idempotent patterns for adding series and episodes.
 
 ### Bulk-import episodes from a CSV
 
 Use `scripts/import-episodes.mjs` to load a whole series' episodes (with recaps).
-CSV header columns: `episode_number,title,synopsis,air_date` (`synopsis` is the recap;
-`air_date` is `YYYY-MM-DD`; both optional). See `scripts/episodes.sample.csv`.
+CSV header columns: `episode_number,title,synopsis,air_date,episode_type` (`synopsis`
+is the recap; `air_date` is `YYYY-MM-DD`; `episode_type` is the filler/clip-show tag —
+all three optional). See `scripts/episodes.sample.csv`.
+
+The `episode_type` column is only written when the CSV declares it, so re-importing
+an older tag-less CSV won't clear tags you've already set. When the column *is*
+present it's authoritative: a blank cell clears the tag.
 
 ```bash
 # 1) Generate idempotent SQL to review, then run it in the Supabase SQL editor:

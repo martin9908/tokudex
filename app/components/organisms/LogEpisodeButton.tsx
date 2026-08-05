@@ -9,6 +9,7 @@ type LogEpisodeButtonProps = {
     episodeNumber: number;
     episodeTitle?: string | null;
     episodeSynopsis?: string | null;
+    episodeType?: string | null;
     className?: string;
     label?: string;
 };
@@ -19,6 +20,7 @@ export default function LogEpisodeButton({
     episodeNumber,
     episodeTitle,
     episodeSynopsis,
+    episodeType,
     className,
     label,
 }: LogEpisodeButtonProps) {
@@ -41,6 +43,7 @@ export default function LogEpisodeButton({
                     episodeNumber={episodeNumber}
                     episodeTitle={episodeTitle}
                     episodeSynopsis={episodeSynopsis}
+                    episodeType={episodeType}
                     onClose={() => setOpen(false)}
                 />
             )}

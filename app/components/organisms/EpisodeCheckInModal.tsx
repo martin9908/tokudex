@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveEpisodeCheckIn } from "../../actions";
 import { NOTE_MAX_LENGTH } from "@/lib/validation";
+import { episodeTypeBadgeClass, episodeTypeLabel } from "@/lib/episodeTypes";
 import { buttonClasses } from "../atoms";
 
 type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
@@ -16,6 +17,7 @@ type EpisodeCheckInModalProps = {
     episodeNumber: number;
     episodeTitle?: string | null;
     episodeSynopsis?: string | null;
+    episodeType?: string | null;
     onClose: () => void;
     onSaved?: () => void;
 };
@@ -27,6 +29,7 @@ export default function EpisodeCheckInModal({
     episodeNumber,
     episodeTitle,
     episodeSynopsis,
+    episodeType,
     onClose,
     onSaved,
 }: EpisodeCheckInModalProps) {
@@ -100,6 +103,13 @@ export default function EpisodeCheckInModal({
                             Episode {episodeNumber}
                             {episodeTitle ? ` · ${episodeTitle}` : ""}
                         </p>
+                        {episodeTypeLabel(episodeType) && (
+                            <span
+                                className={`mt-1.5 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${episodeTypeBadgeClass(episodeType)}`}
+                            >
+                                {episodeTypeLabel(episodeType)}
+                            </span>
+                        )}
                     </div>
                     <button
                         type="button"
