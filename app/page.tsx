@@ -1,326 +1,566 @@
 import Link from "next/link";
+import {
+    CheckCircle,
+    FilmSlate,
+    Trophy,
+    Medal,
+    Sparkle,
+    LockSimple,
+} from "@phosphor-icons/react/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProgressBySeries } from "@/lib/supabase/queries";
 import { getReferralCount } from "@/lib/referrals";
-import { toWatchItems, summarizeProgress, watchedPercent, type WatchItem } from "@/lib/progress";
-import { LinkButton, PosterImage, ProgressBar, buttonClasses } from "./components/atoms";
+import { toWatchItems, summarizeProgress, relativeTime } from "@/lib/progress";
+import { isTokuSeries } from "@/lib/catalog";
+import { getRank, getAchievements, countEarned } from "@/lib/achievements";
+import type { ProgressStatus } from "@/lib/validation";
+import { PosterImage, ProgressBar, buttonClasses } from "./components/atoms";
 import LogEpisodeButton from "./components/organisms/LogEpisodeButton";
-import SupportBanner from "./components/molecules/SupportBanner";
-import Achievements from "./components/organisms/Achievements";
-import FranchiseAchievements from "./components/organisms/FranchiseAchievements";
 import GuestHome from "./components/organisms/GuestHome";
-import JsonLd from "./components/JsonLd";
-import { SITE_URL, SITE_NAME, absoluteUrl } from "@/lib/seo";
+import SupportBanner from "./components/molecules/SupportBanner";
+import ChangeStatusSelect from "./components/molecules/ChangeStatusSelect";
+import ResumeButton from "./components/molecules/ResumeButton";
 
-const websiteJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: SITE_NAME,
-    url: SITE_URL,
-    potentialAction: {
-        "@type": "SearchAction",
-        target: {
-            "@type": "EntryPoint",
-            urlTemplate: absoluteUrl("/series?q={search_term_string}"),
-        },
-        "query-input": "required name=search_term_string",
-    },
+const CATEGORY_LABEL: Record<string, string> = {
+    tokusatsu: "Tokusatsu",
+    anime: "Anime",
+    other: "Other",
 };
+
+const MILESTONE_ICONS = [Trophy, Medal, Sparkle];
 
 export default async function Home() {
     const client = await createClient();
-
     const {
         data: { user },
     } = await client.auth.getUser();
+    if (!user) return <GuestHome />;
 
-    // Guests (no account) get a read-only preview instead of the tracker home.
-    if (!user) {
-        return (
-            <>
-                <JsonLd data={websiteJsonLd} />
-                <GuestHome />
-            </>
-        );
-    }
-
-    const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
-    const displayName = fullName || user.email?.split("@")[0] || "there";
-
-    let watchItems: WatchItem[] = [];
-    let stats = summarizeProgress([]);
-    let loadError = false;
-
-    try {
-        const rows = await getUserProgressBySeries(user.id);
-        watchItems = toWatchItems(rows);
-        stats = summarizeProgress(rows);
-    } catch {
-        loadError = true;
-    }
-
-    // Continue Tracking = series actively in progress; Recently Updated = any
-    // series by most recent activity (rows are already ordered by updated_at).
-    const featured = watchItems.filter((item) => item.progress.status === "watching").slice(0, 3);
-    const recentlyUpdated = watchItems.slice(0, 5);
-    const primaryItem = watchItems[0];
-
-    // Tracker Summary aggregates + the most-recent series for a quick resume.
-    const totalTracked = watchItems.length;
-    const episodesLogged = watchItems.reduce(
-        (sum, item) => sum + (item.progress.current_episode || 0),
-        0
+    const rows = await getUserProgressBySeries(user.id);
+    const items = toWatchItems(rows);
+    const stats = summarizeProgress(rows);
+    const toku = items.filter((i) => isTokuSeries(i.series));
+    const tokuCompleted = toku.filter(
+        (i) => i.progress.status === "completed",
     );
-    const primaryTotal = primaryItem?.series.total_episodes || 0;
-    const primaryCurrent = primaryItem?.progress.current_episode || 0;
-    const primaryPct = watchedPercent(primaryCurrent, primaryTotal);
-    const primaryNext = Math.min(primaryCurrent + 1, primaryTotal || primaryCurrent + 1);
-    const primaryHasNext = !!primaryItem && primaryCurrent < (primaryTotal || Infinity);
+    const tokuEpisodesLogged = toku.reduce(
+        (n, i) => n + i.progress.current_episode,
+        0,
+    );
 
-    const completedSeries = watchItems
-        .filter((item) => item.progress.status === "completed")
-        .map((item) => ({ title: item.series.title, franchise: item.series.franchise }));
+    const seriesItems = items.filter((i) => i.series.format === "series");
+    const movieItems = items.filter((i) => i.series.format === "movie");
+    const episodes = seriesItems.reduce(
+        (sum, i) => sum + i.progress.current_episode,
+        0,
+    );
+    const moviesWatched = movieItems.filter(
+        (i) => i.progress.current_episode === 1,
+    ).length;
 
-    const referralCount = await getReferralCount(user.id);
+    const upNext =
+        seriesItems.find((i) => i.progress.status !== "completed") ??
+        seriesItems[0];
+    const alsoWatching = seriesItems.filter((i) => i !== upNext);
+
+    const [{ data: lastEpisode }, referralCount] = await Promise.all([
+        upNext
+            ? client
+                  .from("episodes")
+                  .select("title, synopsis")
+                  .eq("series_id", upNext.series.id)
+                  .eq("episode_number", upNext.progress.current_episode)
+                  .maybeSingle()
+            : Promise.resolve({ data: null }),
+        getReferralCount(user.id),
+    ]);
+
+    const { current: rankCurrent, next: rankNext } = getRank(
+        tokuEpisodesLogged,
+    );
+    const rankPct = rankNext
+        ? Math.round(
+              ((tokuEpisodesLogged - rankCurrent.min) /
+                  (rankNext.min - rankCurrent.min)) *
+                  100,
+          )
+        : 100;
+    const milestones = getAchievements({
+        seriesTracked: toku.length,
+        episodesLogged: tokuEpisodesLogged,
+        seriesCompleted: tokuCompleted.length,
+        referralCount,
+    });
+    const earnedCount = countEarned(milestones);
+    const earnedMilestones = milestones.filter((m) => m.earned);
+    const lastEarned = earnedMilestones[earnedMilestones.length - 1];
+    const nextMilestone = milestones.find((m) => !m.earned);
+
+    const upNextBadge = upNext
+        ? (upNext.series.franchise ??
+          CATEGORY_LABEL[upNext.series.category] ??
+          null)
+        : null;
 
     return (
-        <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10">
-            <JsonLd data={websiteJsonLd} />
-            <main className="space-y-4">
-                <section className="tdx-panel p-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Welcome back, {displayName}!</h1>
-                            <p className="text-cyan-200/70 mt-1">
-                                Pick up where you left off. TokuDex tracks the tokusatsu you&apos;re watching — it doesn&apos;t stream them.
-                            </p>
-                        </div>
-                        <form action="/series" method="get" className="hidden md:block w-64">
-                            <input
-                                type="search"
-                                name="q"
-                                aria-label="Search series"
-                                placeholder="Search series..."
-                                className="tdx-field px-3 py-2.5"
-                            />
-                        </form>
-                    </div>
-
-                    <h2 className="text-xl font-semibold mb-3">Continue Tracking</h2>
-                    {loadError ? (
-                        <p className="rounded-xl border border-red-900/45 bg-red-500/10 p-4 text-sm text-red-300">
-                            We couldn&apos;t load your tracker right now. Please refresh to try again.
-                        </p>
-                    ) : watchItems.length === 0 ? (
-                        <div className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-5">
-                            <p className="text-base font-semibold text-cyan-100">Welcome to TokuDex 👋</p>
-                            <p className="text-sm text-cyan-200/75 mt-1 mb-4">
-                                Your tokusatsu episode tracker — never lose your place again. Three steps to start:
-                            </p>
-                            <ol className="space-y-2.5 text-sm text-cyan-100/85 mb-5">
-                                {[
-                                    "Find a series in the library",
-                                    "Add it to your tracker",
-                                    "Log each episode and jot a quick recap",
-                                ].map((step, i) => (
-                                    <li key={i} className="flex items-start gap-2.5">
-                                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-semibold text-cyan-300">
-                                            {i + 1}
+        <div className="max-w-6xl mx-auto px-6 py-6 pb-24">
+            {items.length === 0 && (
+                <p className="tdx-panel p-5 text-[var(--text-secondary)] mb-6">
+                    Find a title in the library, add it to your tracker, and
+                    log what you watch.
+                </p>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_292px] gap-6">
+                <div className="flex flex-col gap-6 min-w-0">
+                    {upNext && (
+                        <section>
+                            <div className="flex items-baseline gap-2.5 mb-2.5">
+                                <span className="text-[10.5px] uppercase tracking-[0.13em] text-[var(--accent-primary)]">
+                                    Up next
+                                </span>
+                                <span className="text-[11.5px] text-[var(--text-muted)]">
+                                    last logged{" "}
+                                    {relativeTime(
+                                        upNext.progress.last_watched_at,
+                                    )}
+                                </span>
+                            </div>
+                            <article className="p-4 md:p-[18px] rounded-lg bg-[var(--surface)] border border-[var(--line)] flex gap-5 flex-col sm:flex-row">
+                                <Link
+                                    href={`/series/${upNext.series.id}`}
+                                    className="tdx-focus-ring relative aspect-[3/4] w-full sm:w-[132px] flex-none rounded-md overflow-hidden"
+                                >
+                                    <PosterImage
+                                        src={upNext.series.cover_image_url}
+                                        alt={upNext.series.title}
+                                        sizes="(max-width:640px) 90vw, 132px"
+                                    />
+                                </Link>
+                                <div className="flex-1 min-w-0 flex flex-col">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {upNextBadge && (
+                                            <span className="inline-flex items-center rounded-md bg-[var(--accent-tint)] text-[var(--accent-on)] text-[11px] px-2 py-0.5">
+                                                {upNextBadge}
+                                            </span>
+                                        )}
+                                        <span className="text-[11.5px] text-[var(--text-muted)]">
+                                            {[
+                                                upNext.series.release_year,
+                                                upNext.series.total_episodes
+                                                    ? `${upNext.series.total_episodes} episodes`
+                                                    : null,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" · ")}
                                         </span>
-                                        {step}
-                                    </li>
-                                ))}
-                            </ol>
-                            <LinkButton href="/series">Browse the series library →</LinkButton>
-                        </div>
-                    ) : featured.length === 0 ? (
-                        <p className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-4 text-sm text-cyan-100/70">
-                            Nothing in progress right now — pick one back up from{" "}
-                            <Link href="/series" className="text-cyan-300 hover:text-cyan-200">
-                                your library
-                            </Link>
-                            .
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                            {featured.map(({ progress, series }) => {
-                                const cur = progress.current_episode || 0;
-                                const total = series.total_episodes || 0;
-                                const next = Math.min(cur + 1, total || cur + 1);
-                                const hasNext = cur < (total || Infinity);
-
-                                return (
-                                    <article
-                                        key={series.id}
-                                        className="rounded-xl border border-cyan-900/45 bg-[linear-gradient(145deg,#081b2c,#050d17)] p-3"
-                                    >
-                                        <div className="relative aspect-[3/4] rounded-lg border border-cyan-900/50 bg-[#091a2b] mb-3 overflow-hidden">
-                                            <PosterImage
-                                                src={series.cover_image_url}
-                                                alt={series.title}
-                                                sizes="(max-width: 640px) 90vw, 220px"
-                                                iconClassName="h-24 w-24 opacity-95"
-                                            />
+                                    </div>
+                                    <h2 className="text-[23px] font-medium mt-1.5 leading-[1.15] tracking-[-0.015em]">
+                                        {upNext.series.title}
+                                    </h2>
+                                    <div className="mt-3 text-[13.5px]">
+                                        <span className="text-[var(--accent-text)]">
+                                            Episode{" "}
+                                            {upNext.progress.current_episode}
+                                        </span>
+                                        {lastEpisode?.title
+                                            ? ` · ${lastEpisode.title}`
+                                            : ""}
+                                    </div>
+                                    {upNext.series.total_episodes && (
+                                        <div className="mt-2.5 flex items-center gap-2.5">
+                                            <div className="flex-1">
+                                                <ProgressBar
+                                                    value={
+                                                        upNext.progress
+                                                            .current_episode
+                                                    }
+                                                    max={
+                                                        upNext.series
+                                                            .total_episodes
+                                                    }
+                                                    size="sm"
+                                                    label="Watch progress"
+                                                />
+                                            </div>
+                                            <span className="text-[11.5px] text-[var(--text-secondary)] whitespace-nowrap">
+                                                {upNext.progress.current_episode}{" "}
+                                                / {upNext.series.total_episodes}{" "}
+                                                ·{" "}
+                                                {Math.round(
+                                                    (upNext.progress
+                                                        .current_episode /
+                                                        upNext.series
+                                                            .total_episodes) *
+                                                        100,
+                                                )}
+                                                %
+                                            </span>
                                         </div>
-                                        <p className="text-[11px] tracking-[0.25em] text-cyan-200/75 uppercase mb-1">
-                                            {series.franchise || "Series"}
+                                    )}
+                                    <div className="mt-3.5 p-[11px] rounded-md bg-[var(--sunk)] border-l-2 border-l-[var(--accent-primary)]">
+                                        <div className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--accent-text)] mb-1">
+                                            Where you left off · ep{" "}
+                                            {upNext.progress.current_episode}
+                                        </div>
+                                        <p className="text-[13px] leading-[1.5]">
+                                            {lastEpisode?.synopsis ??
+                                                "No recap available yet."}
                                         </p>
-                                        <h3 className="text-xl font-semibold uppercase leading-tight line-clamp-2">
-                                            {series.title}
-                                        </h3>
-                                        <p className="text-sm text-cyan-100/80 mt-1">
-                                            Episode {progress.current_episode || "1"}
-                                        </p>
-                                        <p className="text-sm text-cyan-200/70 mb-2">Tracking</p>
-                                        <ProgressBar
-                                            value={cur}
-                                            max={total || 1}
-                                            size="sm"
-                                            label={`${watchedPercent(cur, total)}% watched`}
-                                            className="mb-2"
-                                        />
-                                        <div className="mt-2 flex flex-col gap-2">
-                                            {hasNext && (
+                                    </div>
+                                    <div className="mt-auto pt-4 flex items-center gap-2.5 flex-wrap">
+                                        {!upNext.series.hidden &&
+                                            (!upNext.series.total_episodes ||
+                                                upNext.progress
+                                                    .current_episode <
+                                                    upNext.series
+                                                        .total_episodes) && (
                                                 <LogEpisodeButton
-                                                    seriesId={series.id}
-                                                    seriesTitle={series.title}
-                                                    episodeNumber={next}
-                                                    className={buttonClasses({ variant: "primary", full: true })}
+                                                    seriesId={upNext.series.id}
+                                                    seriesTitle={
+                                                        upNext.series.title
+                                                    }
+                                                    episodeNumber={
+                                                        upNext.progress
+                                                            .current_episode +
+                                                        1
+                                                    }
+                                                    label={`Log episode ${upNext.progress.current_episode + 1}`}
+                                                    className={buttonClasses({
+                                                        size: "sm",
+                                                    })}
                                                 />
                                             )}
-                                            <LinkButton href={`/series/${series.id}`} variant="secondary" full>
-                                                Open Tracker
-                                            </LinkButton>
-                                        </div>
-                                    </article>
-                                );
-                            })}
-                        </div>
-                    )}
-                </section>
-
-                {primaryItem && (
-                    <>
-                        <section className="tdx-panel p-4 md:p-5">
-                            <h2 className="text-2xl font-semibold mb-3">Tracker Summary</h2>
-                            <div className="grid grid-cols-3 gap-2 mb-4">
-                                <div className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3 text-center">
-                                    <p className="text-2xl font-bold text-cyan-300">{totalTracked}</p>
-                                    <p className="text-[11px] uppercase tracking-wider text-cyan-200/70">Series</p>
-                                </div>
-                                <div className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3 text-center">
-                                    <p className="text-2xl font-bold text-cyan-300">{episodesLogged}</p>
-                                    <p className="text-[11px] uppercase tracking-wider text-cyan-200/70">Episodes</p>
-                                </div>
-                                <div className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3 text-center">
-                                    <p className="text-2xl font-bold text-emerald-300">{stats.completed}</p>
-                                    <p className="text-[11px] uppercase tracking-wider text-cyan-200/70">Completed</p>
-                                </div>
-                            </div>
-
-                            <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-cyan-100/80">
-                                <span><span className="text-cyan-300 font-semibold">{stats.watching}</span> Watching</span>
-                                <span><span className="text-amber-300 font-semibold">{stats.on_hold}</span> On Hold</span>
-                                <span><span className="text-slate-300 font-semibold">{stats.plan_to_watch}</span> Plan</span>
-                            </div>
-
-                            <p className="text-xs uppercase tracking-wider text-cyan-200/70 mb-2">Most recent</p>
-                            <article className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3">
-                                <div className="flex items-center gap-4">
-                                    <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg border border-cyan-900/50 bg-[#091a2b]">
-                                        <PosterImage
-                                            src={primaryItem.series.cover_image_url}
-                                            alt={primaryItem.series.title}
-                                            sizes="64px"
-                                            iconClassName="h-9 w-9"
+                                        <Link
+                                            href={`/series/${upNext.series.id}`}
+                                            className={buttonClasses({
+                                                variant: "secondary",
+                                                size: "sm",
+                                            })}
+                                        >
+                                            Open tracker
+                                        </Link>
+                                        <ChangeStatusSelect
+                                            seriesId={upNext.series.id}
+                                            currentEpisode={
+                                                upNext.progress.current_episode
+                                            }
+                                            status={
+                                                upNext.progress
+                                                    .status as ProgressStatus
+                                            }
+                                            className="ml-auto text-sm"
                                         />
                                     </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-xs tracking-[0.3em] uppercase text-cyan-300/80 mb-1">
-                                            {primaryItem.series.franchise || "Series"}
-                                        </p>
-                                        <p className="text-base font-semibold leading-tight line-clamp-1">
-                                            {primaryItem.series.title}
-                                        </p>
-                                        <p className="text-xs text-cyan-200/75 mt-0.5">
-                                            Episode {primaryCurrent || 1} of {primaryTotal || "?"} · updated{" "}
-                                            {new Date(primaryItem.progress.last_watched_at).toLocaleDateString()}
-                                        </p>
-                                        <ProgressBar
-                                            value={primaryCurrent}
-                                            max={primaryTotal || 1}
-                                            size="sm"
-                                            label={`${primaryPct}% watched`}
-                                            className="mt-2"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {primaryHasNext && (
-                                        <LogEpisodeButton
-                                            seriesId={primaryItem.series.id}
-                                            seriesTitle={primaryItem.series.title}
-                                            episodeNumber={primaryNext}
-                                            className={buttonClasses({ variant: "primary", className: "flex-1 min-w-[140px]" })}
-                                        />
-                                    )}
-                                    <LinkButton
-                                        href={`/series/${primaryItem.series.id}`}
-                                        variant="secondary"
-                                        className="flex-1 min-w-[140px]"
-                                    >
-                                        Open Tracker
-                                    </LinkButton>
                                 </div>
                             </article>
                         </section>
+                    )}
 
-                        <Achievements
-                            seriesTracked={totalTracked}
-                            episodesLogged={episodesLogged}
-                            seriesCompleted={stats.completed}
-                            referralCount={referralCount}
-                        />
-
-                        <FranchiseAchievements completed={completedSeries} />
-
-                        <section className="tdx-panel p-4 md:p-5">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-2xl font-semibold">Recently Updated</h2>
-                                <Link href="/series" className="text-sm text-cyan-300 hover:text-cyan-200">View All</Link>
+                    {alsoWatching.length > 0 && (
+                        <section>
+                            <div className="flex items-baseline gap-2.5 mb-2.5">
+                                <span className="text-[10.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
+                                    Also watching
+                                </span>
+                                <span className="text-[11.5px] text-[var(--text-muted)]">
+                                    {alsoWatching.length} series
+                                </span>
+                                <Link
+                                    href="/series"
+                                    className="ml-auto text-xs text-[var(--accent-primary)]"
+                                >
+                                    Browse library →
+                                </Link>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                                {recentlyUpdated.map(({ progress, series }) => (
-                                    <Link
-                                        key={series.id}
-                                        href={`/series/${series.id}`}
-                                        className="tdx-focus-ring rounded-xl border border-cyan-900/45 bg-[#081a2b]/80 p-2.5 hover:border-cyan-700/45 transition-colors"
-                                    >
-                                        <div className="relative aspect-[3/4] rounded-lg border border-cyan-900/50 bg-[#091a2b] mb-2 overflow-hidden">
-                                            <PosterImage
-                                                src={series.cover_image_url}
-                                                alt={series.title}
-                                                sizes="(max-width: 768px) 45vw, 180px"
-                                                iconClassName="h-14 w-14"
-                                            />
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                                {alsoWatching.map(({ series: s, progress: p }) => {
+                                    const onHold = p.status === "on_hold";
+                                    const atFinale = s.total_episodes
+                                        ? p.current_episode + 1 ===
+                                          s.total_episodes
+                                        : false;
+                                    return (
+                                        <div
+                                            key={s.id}
+                                            className="flex flex-col gap-[9px] p-[11px] rounded-lg bg-[var(--surface)] border border-[var(--line)]"
+                                        >
+                                            <Link
+                                                href={`/series/${s.id}`}
+                                                className="tdx-focus-ring relative aspect-[3/4] rounded-[5px] overflow-hidden block"
+                                            >
+                                                <PosterImage
+                                                    src={s.cover_image_url}
+                                                    alt={s.title}
+                                                    sizes="(max-width:640px) 45vw, 220px"
+                                                />
+                                            </Link>
+                                            <p className="text-[13px] font-medium leading-tight">
+                                                {s.title}
+                                            </p>
+                                            {onHold ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-[5px] border border-[var(--line)] text-[var(--text-secondary)]">
+                                                        On hold
+                                                    </span>
+                                                    <span className="text-[11.5px] text-[var(--text-muted)]">
+                                                        Ep {p.current_episode}{" "}
+                                                        of{" "}
+                                                        {s.total_episodes ??
+                                                            "?"}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <p className="text-[11.5px] text-[var(--text-secondary)]">
+                                                    {s.hidden
+                                                        ? "Currently unavailable"
+                                                        : `Ep ${p.current_episode} of ${s.total_episodes ?? "?"}`}
+                                                </p>
+                                            )}
+                                            {s.total_episodes && (
+                                                <ProgressBar
+                                                    value={p.current_episode}
+                                                    max={s.total_episodes}
+                                                    size="sm"
+                                                    label="Watch progress"
+                                                />
+                                            )}
+                                            {!s.hidden &&
+                                                (onHold ? (
+                                                    <ResumeButton
+                                                        seriesId={s.id}
+                                                        currentEpisode={
+                                                            p.current_episode
+                                                        }
+                                                        className={buttonClasses(
+                                                            {
+                                                                variant:
+                                                                    "secondary",
+                                                                size: "sm",
+                                                                full: true,
+                                                            },
+                                                        )}
+                                                    />
+                                                ) : (
+                                                    (!s.total_episodes ||
+                                                        p.current_episode <
+                                                            s.total_episodes) && (
+                                                        <LogEpisodeButton
+                                                            seriesId={s.id}
+                                                            seriesTitle={
+                                                                s.title
+                                                            }
+                                                            episodeNumber={
+                                                                p.current_episode +
+                                                                1
+                                                            }
+                                                            label={
+                                                                atFinale
+                                                                    ? "Finish series"
+                                                                    : `Log ep ${p.current_episode + 1}`
+                                                            }
+                                                            className={buttonClasses(
+                                                                {
+                                                                    size: "sm",
+                                                                    full: true,
+                                                                },
+                                                            )}
+                                                        />
+                                                    )
+                                                ))}
                                         </div>
-                                        <p className="text-sm font-medium leading-tight mb-1">{series.title}</p>
-                                        <p className="text-xs text-cyan-200/70 mb-2">Episode {progress.current_episode || "1"}</p>
-                                        <ProgressBar
-                                            value={progress.current_episode || 0}
-                                            max={series.total_episodes || 1}
-                                            size="sm"
-                                            label={`${watchedPercent(progress.current_episode, series.total_episodes)}% watched`}
-                                        />
-                                    </Link>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
-                    </>
-                )}
+                    )}
 
+                    {movieItems.length > 0 && (
+                        <section className="space-y-3">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-[10.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
+                                    Movies
+                                </span>
+                                <span className="text-[11.5px] text-[var(--text-muted)]">
+                                    watched or not — no episode counts
+                                </span>
+                            </div>
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {movieItems.map(({ series: s, progress: p }) => {
+                                    const watched = p.current_episode === 1;
+                                    return (
+                                        <Link
+                                            key={s.id}
+                                            href={`/series/${s.id}`}
+                                            className={`tdx-focus-ring tdx-panel p-3 flex items-center gap-3 border-l-[3px] ${
+                                                watched
+                                                    ? "border-l-[var(--accent-primary)]"
+                                                    : "border-l-[var(--line)]"
+                                            }`}
+                                        >
+                                            <FilmSlate
+                                                size={22}
+                                                className={
+                                                    watched
+                                                        ? "text-[var(--accent-primary)]"
+                                                        : "text-[var(--text-muted)]"
+                                                }
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium">
+                                                    {s.title}
+                                                </p>
+                                                <p className="text-[11.5px] text-[var(--text-secondary)] mt-0.5">
+                                                    {s.release_year ?? ""}
+                                                </p>
+                                            </div>
+                                            {watched ? (
+                                                <span className="inline-flex items-center gap-1 text-[11.5px] text-[var(--accent-primary)]">
+                                                    <CheckCircle
+                                                        size={14}
+                                                        weight="fill"
+                                                    />
+                                                    Watched
+                                                </span>
+                                            ) : (
+                                                <span className="text-[11.5px] text-[var(--text-muted)]">
+                                                    Plan to watch
+                                                </span>
+                                            )}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
+                </div>
+
+                <aside className="flex flex-col gap-4">
+                    <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
+                        <div className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
+                            Rank
+                        </div>
+                        <div className="text-[22px] font-medium mt-1 tracking-[-0.01em]">
+                            {rankCurrent.title}
+                        </div>
+                        <div className="mt-3">
+                            <ProgressBar
+                                value={rankPct}
+                                max={100}
+                                size="sm"
+                                label={`${rankPct}% to next rank`}
+                            />
+                        </div>
+                        <div className="mt-1.5 flex justify-between text-[11px] text-[var(--text-secondary)]">
+                            <span>{tokuEpisodesLogged} episodes logged</span>
+                            <span>
+                                {rankNext
+                                    ? `${rankNext.title} at ${rankNext.min}`
+                                    : "Max rank"}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
+                        <div className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
+                            Tracker
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-2.5 gap-y-3.5 mt-3.5">
+                            <div>
+                                <div className="text-2xl font-medium leading-none text-[var(--accent-text)]">
+                                    {items.length}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
+                                    Titles tracked
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-medium leading-none text-[var(--accent-text)]">
+                                    {episodes}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
+                                    Episodes watched
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-medium leading-none">
+                                    {stats.completed}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
+                                    Titles completed
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-medium leading-none">
+                                    {moviesWatched}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
+                                    Movies watched
+                                </div>
+                            </div>
+                        </div>
+                        <div className="mt-3.5 pt-3 border-t border-[var(--line)] text-[11.5px] text-[var(--text-secondary)]">
+                            {stats.watching} watching · {stats.on_hold} on
+                            hold · {stats.plan_to_watch} planned
+                        </div>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
+                                Awards
+                            </span>
+                            <span className="text-[11px] text-[var(--text-muted)]">
+                                {earnedCount} of {milestones.length}
+                            </span>
+                            <Link
+                                href="/achievements"
+                                className="ml-auto text-[11.5px] text-[var(--accent-primary)]"
+                            >
+                                All →
+                            </Link>
+                        </div>
+                        <div className="grid grid-cols-5 gap-2 mt-3.5">
+                            {milestones.slice(0, 5).map((m, i) => {
+                                const Icon =
+                                    MILESTONE_ICONS[i % MILESTONE_ICONS.length];
+                                return (
+                                    <div
+                                        key={m.key}
+                                        className={`aspect-square rounded-md grid place-items-center text-base ${
+                                            m.earned
+                                                ? "bg-[var(--accent-tint)] text-[var(--accent-on)]"
+                                                : "bg-[var(--sunk)] text-[var(--text-muted)]"
+                                        }`}
+                                    >
+                                        {m.earned ? (
+                                            <Icon weight="fill" />
+                                        ) : (
+                                            <LockSimple />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-2.5 text-[11.5px] text-[var(--text-secondary)] leading-[1.45]">
+                            {lastEarned ? `${lastEarned.label} earned. ` : ""}
+                            {nextMilestone ? (
+                                <>
+                                    <span className="text-[var(--text-primary)]">
+                                        {nextMilestone.target -
+                                            nextMilestone.current}
+                                    </span>{" "}
+                                    to {nextMilestone.label}.
+                                </>
+                            ) : (
+                                "All milestones unlocked."
+                            )}
+                        </p>
+                    </div>
+                </aside>
+            </div>
+            <div className="mt-6">
                 <SupportBanner />
-            </main>
+            </div>
         </div>
     );
 }

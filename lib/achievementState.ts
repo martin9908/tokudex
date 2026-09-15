@@ -1,3 +1,4 @@
+import { isTokuSeries } from "./catalog";
 import { createClient } from "./supabase/server";
 import {
     getRank,
@@ -17,7 +18,12 @@ import { getReferralCount } from "./referrals";
 type ProgressRow = {
     current_episode: number | null;
     status: string | null;
-    series: { title: string; franchise: string | null } | null;
+    series: {
+        title: string;
+        franchise: string | null;
+        category: string;
+        format: string;
+    } | null;
 };
 
 type ProgressTotals = {
@@ -29,7 +35,10 @@ type ProgressTotals = {
 };
 
 // Loads + reduces the signed-in user's progress. Returns null when logged out.
-async function loadProgress(): Promise<{ userId: string; totals: ProgressTotals } | null> {
+async function loadProgress(): Promise<{
+    userId: string;
+    totals: ProgressTotals;
+} | null> {
     const supabase = await createClient();
     const {
         data: { user },
@@ -38,17 +47,26 @@ async function loadProgress(): Promise<{ userId: string; totals: ProgressTotals 
 
     const { data } = await supabase
         .from("user_series_progress")
-        .select("current_episode, status, series(title, franchise)")
+        .select(
+            "current_episode, status, series(title, franchise, category, format)",
+        )
         .eq("user_id", user.id);
 
-    const rows = (data ?? []) as unknown as ProgressRow[];
-    const completedRows = rows.filter((r) => r.status === "completed" && r.series);
+    const rows = ((data ?? []) as unknown as ProgressRow[]).filter(
+        (r) => r.series && isTokuSeries(r.series),
+    );
+    const completedRows = rows.filter(
+        (r) => r.status === "completed" && r.series,
+    );
 
     return {
         userId: user.id,
         totals: {
             seriesTracked: rows.length,
-            episodesLogged: rows.reduce((sum, r) => sum + (r.current_episode || 0), 0),
+            episodesLogged: rows.reduce(
+                (sum, r) => sum + (r.current_episode || 0),
+                0,
+            ),
             seriesCompleted: completedRows.length,
             completed: completedRows.map((r) => ({
                 title: r.series!.title,
@@ -61,8 +79,17 @@ async function loadProgress(): Promise<{ userId: string; totals: ProgressTotals 
 
 // Stable earned keys (+ labels) for everything currently earned. Used by the
 // global toaster and by syncAchievements.
-function deriveEarned(totals: ProgressTotals): { earned: string[]; labels: Record<string, string> } {
-    const { seriesTracked, episodesLogged, seriesCompleted, completed, referralCount } = totals;
+function deriveEarned(totals: ProgressTotals): {
+    earned: string[];
+    labels: Record<string, string>;
+} {
+    const {
+        seriesTracked,
+        episodesLogged,
+        seriesCompleted,
+        completed,
+        referralCount,
+    } = totals;
     const earned: string[] = [];
     const labels: Record<string, string> = {};
 
@@ -71,7 +98,12 @@ function deriveEarned(totals: ProgressTotals): { earned: string[]; labels: Recor
     earned.push(rankKey);
     labels[rankKey] = `New rank: ${current.title}`;
 
-    for (const a of getAchievements({ seriesTracked, episodesLogged, seriesCompleted, referralCount })) {
+    for (const a of getAchievements({
+        seriesTracked,
+        episodesLogged,
+        seriesCompleted,
+        referralCount,
+    })) {
         if (a.earned) {
             earned.push(`ach-${a.key}`);
             labels[`ach-${a.key}`] = a.label;
@@ -117,13 +149,21 @@ export async function syncAchievements(): Promise<void> {
         .select("achievement_key")
         .eq("user_id", loaded.userId);
     const known = new Set(
-        (existing ?? []).map((r) => (r as { achievement_key: string }).achievement_key)
+        (existing ?? []).map(
+            (r) => (r as { achievement_key: string }).achievement_key,
+        ),
     );
 
-    const rows = earned.map((key) => ({ user_id: loaded.userId, achievement_key: key }));
+    const rows = earned.map((key) => ({
+        user_id: loaded.userId,
+        achievement_key: key,
+    }));
     await supabase
         .from("user_achievements")
-        .upsert(rows, { onConflict: "user_id,achievement_key", ignoreDuplicates: true });
+        .upsert(rows, {
+            onConflict: "user_id,achievement_key",
+            ignoreDuplicates: true,
+        });
 
     for (const key of earned) {
         if (!known.has(key)) await trackServer("achievement_earned", { key });
@@ -145,14 +185,25 @@ export type AchievementsView = {
 export async function getAchievementsView(): Promise<AchievementsView | null> {
     const loaded = await loadProgress();
     if (!loaded) return null;
-    const { seriesTracked, episodesLogged, seriesCompleted, completed, referralCount } = loaded.totals;
+    const {
+        seriesTracked,
+        episodesLogged,
+        seriesCompleted,
+        completed,
+        referralCount,
+    } = loaded.totals;
 
     const { current, next } = getRank(episodesLogged);
-    const milestones = getAchievements({ seriesTracked, episodesLogged, seriesCompleted, referralCount });
+    const milestones = getAchievements({
+        seriesTracked,
+        episodesLogged,
+        seriesCompleted,
+        referralCount,
+    });
     const collections = evaluateCollections(completed);
 
     const earnedBadgeKeys = new Set(
-        getEarnedSeriesBadges(completed.map((c) => c.title)).map((b) => b.key)
+        getEarnedSeriesBadges(completed.map((c) => c.title)).map((b) => b.key),
     );
     const seriesBadges = SERIES_BADGES.map((b) => ({
         key: `series-${b.key}`,
@@ -181,7 +232,8 @@ export async function getAchievementsView(): Promise<AchievementsView | null> {
         milestones.filter((m) => m.earned).length +
         collections.filter((c) => c.earned).length +
         seriesBadges.filter((b) => b.earned).length;
-    const totalCount = milestones.length + collections.length + seriesBadges.length;
+    const totalCount =
+        milestones.length + collections.length + seriesBadges.length;
 
     return {
         episodesLogged,

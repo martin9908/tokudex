@@ -2,7 +2,7 @@ type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "mute
 
 const variantClasses: Record<BadgeVariant, string> = {
     default:
-        "border border-[var(--surface-elevated)] text-[var(--text-secondary)] bg-transparent",
+        "border border-[var(--line)] text-[var(--text-secondary)] bg-transparent",
     success:
         "text-[var(--success)]",
     warning:

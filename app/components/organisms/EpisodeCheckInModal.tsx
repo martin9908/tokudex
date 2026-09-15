@@ -12,6 +12,7 @@ type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
 
 type EpisodeCheckInModalProps = {
     open: boolean;
+    initialNote?: string;
     seriesId: string;
     seriesTitle: string;
     episodeNumber: number;
@@ -24,6 +25,7 @@ type EpisodeCheckInModalProps = {
 
 export default function EpisodeCheckInModal({
     open,
+    initialNote = "",
     seriesId,
     seriesTitle,
     episodeNumber,
@@ -37,7 +39,7 @@ export default function EpisodeCheckInModal({
     const noteId = useId();
     const statusId = useId();
 
-    const [note, setNote] = useState("");
+    const [note, setNote] = useState(initialNote);
     const [status, setStatus] = useState<ProgressStatus>("watching");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,9 @@ export default function EpisodeCheckInModal({
             onSaved?.();
             onClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to save check-in");
+            setError(
+                err instanceof Error ? err.message : "Failed to save check-in",
+            );
             setSaving(false);
         }
     }
@@ -96,7 +100,10 @@ export default function EpisodeCheckInModal({
                         <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/70 mb-1">
                             Episode Check-in
                         </p>
-                        <h2 id="episode-check-in-title" className="text-2xl font-bold leading-tight">
+                        <h2
+                            id="episode-check-in-title"
+                            className="text-2xl font-bold leading-tight"
+                        >
                             {seriesTitle}
                         </h2>
                         <p className="text-cyan-100/75 text-sm mt-1">
@@ -129,7 +136,8 @@ export default function EpisodeCheckInModal({
                 )}
 
                 <p className="mb-4 text-sm text-cyan-100/70">
-                    Mark how far you&apos;ve watched and jot a recap so you remember what happened next time.
+                    Mark how far you&apos;ve watched and jot a recap so you
+                    remember what happened next time.
                 </p>
 
                 {episodeSynopsis && (
@@ -137,13 +145,18 @@ export default function EpisodeCheckInModal({
                         <p className="text-[11px] uppercase tracking-wider text-cyan-300/70 mb-1">
                             Episode recap
                         </p>
-                        <p className="text-sm text-cyan-100/85 leading-relaxed">{episodeSynopsis}</p>
+                        <p className="text-sm text-cyan-100/85 leading-relaxed">
+                            {episodeSynopsis}
+                        </p>
                     </div>
                 )}
 
                 <div className="space-y-4">
                     <div>
-                        <label htmlFor={noteId} className="text-sm font-medium text-cyan-100/90 block mb-2">
+                        <label
+                            htmlFor={noteId}
+                            className="text-sm font-medium text-cyan-100/90 block mb-2"
+                        >
                             Quick recap note
                         </label>
                         <textarea
@@ -161,20 +174,27 @@ export default function EpisodeCheckInModal({
                     </div>
 
                     <div>
-                        <label htmlFor={statusId} className="text-sm font-medium text-cyan-100/90 block mb-2">
+                        <label
+                            htmlFor={statusId}
+                            className="text-sm font-medium text-cyan-100/90 block mb-2"
+                        >
                             Status
                         </label>
                         <div className="relative">
                             <select
                                 id={statusId}
                                 value={status}
-                                onChange={(e) => setStatus(e.target.value as ProgressStatus)}
+                                onChange={(e) =>
+                                    setStatus(e.target.value as ProgressStatus)
+                                }
                                 className="tdx-field appearance-none px-3 py-2.5 pr-10"
                             >
                                 <option value="watching">Watching</option>
                                 <option value="completed">Completed</option>
                                 <option value="on_hold">On Hold</option>
-                                <option value="plan_to_watch">Plan to Watch</option>
+                                <option value="plan_to_watch">
+                                    Plan to Watch
+                                </option>
                             </select>
                             <svg
                                 className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-300"
@@ -184,7 +204,13 @@ export default function EpisodeCheckInModal({
                                 fill="none"
                                 aria-hidden
                             >
-                                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path
+                                    d="M6 9l6 6 6-6"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
                             </svg>
                         </div>
                     </div>
@@ -195,7 +221,10 @@ export default function EpisodeCheckInModal({
                         type="button"
                         onClick={onClose}
                         disabled={saving}
-                        className={buttonClasses({ variant: "secondary", className: "flex-1 min-w-[150px]" })}
+                        className={buttonClasses({
+                            variant: "secondary",
+                            className: "flex-1 min-w-[150px]",
+                        })}
                     >
                         Cancel
                     </button>
@@ -203,13 +232,16 @@ export default function EpisodeCheckInModal({
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className={buttonClasses({ variant: "primary", className: "flex-1 min-w-[150px]" })}
+                        className={buttonClasses({
+                            variant: "primary",
+                            className: "flex-1 min-w-[150px]",
+                        })}
                     >
                         {saving ? "Saving..." : "Save and Mark Watched"}
                     </button>
                 </div>
             </div>
         </div>,
-        document.body
+        document.body,
     );
 }

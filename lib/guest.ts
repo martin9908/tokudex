@@ -3,6 +3,8 @@ import { createClient } from "./supabase/server";
 const GUEST_FRANCHISES = ["Kamen Rider", "Super Sentai", "Ultraman"];
 
 export type GuestSeries = {
+    category: string;
+    format: string;
     id: string;
     title: string;
     franchise: string | null;
@@ -23,7 +25,11 @@ export async function getGuestSeries(): Promise<GuestSeries[]> {
 
     const { data: series } = await supabase
         .from("series")
-        .select("id, title, franchise, total_episodes, synopsis, cover_image_url, original_run");
+        .select(
+            "id, title, franchise, total_episodes, synopsis, cover_image_url, original_run, category, format",
+        )
+        .eq("hidden", false)
+        .order("release_year", { ascending: false, nullsFirst: false });
     const rows = (series ?? []) as SeriesRow[];
 
     // The latest series per franchise, by original run (e.g. "2025-2026").
@@ -31,8 +37,17 @@ export async function getGuestSeries(): Promise<GuestSeries[]> {
     for (const franchise of GUEST_FRANCHISES) {
         const chosen = rows
             .filter((r) => r.franchise === franchise)
-            .sort((a, b) => (b.original_run ?? "").localeCompare(a.original_run ?? ""))[0];
+            .sort((a, b) =>
+                (b.original_run ?? "").localeCompare(a.original_run ?? ""),
+            )[0];
         if (chosen) picks.push(chosen);
+    }
+    for (const candidate of [
+        rows.find((r) => r.category === "anime"),
+        rows.find((r) => r.format === "movie"),
+    ]) {
+        if (candidate && !picks.some((p) => p.id === candidate.id))
+            picks.push(candidate);
     }
     return picks;
 }
