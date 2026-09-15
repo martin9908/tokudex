@@ -7,6 +7,8 @@
  *   title            text, required
  *   synopsis         text, optional — this is the "what happened" recap
  *   air_date         YYYY-MM-DD, optional
+ *   episode_type     optional tag — one of: filler, clip_show, recap, special,
+ *                    crossover. Blank means a regular canon episode.
  *
  * Usage:
  *   node scripts/import-episodes.mjs --series "Kamen Rider Kuuga" --file path/to.csv
@@ -43,9 +45,23 @@ if (!existsSync(file)) {
     process.exit(1);
 }
 
+// Keep in sync with lib/episodeTypes.ts and the CHECK constraint in
+// supabase/migrations/20260804000000_episode_type.sql.
+const EPISODE_TYPES = ["filler", "clip_show", "recap", "special", "crossover"];
+
 // ---- parse CSV ------------------------------------------------------------
+// `episode_type` is only written when the CSV actually declares the column, so
+// re-importing an older tag-less CSV leaves existing tags alone instead of
+// silently clearing them. When the column IS present it is authoritative — a
+// blank cell clears the tag.
+let hasEpisodeTypeColumn = false;
+
 const rows = parse(readFileSync(file), {
-    columns: (header) => header.map((h) => h.trim().toLowerCase()),
+    columns: (header) => {
+        const names = header.map((h) => h.trim().toLowerCase());
+        hasEpisodeTypeColumn = names.includes("episode_type");
+        return names;
+    },
     skip_empty_lines: true,
     trim: true,
 });
@@ -58,6 +74,8 @@ rows.forEach((row, idx) => {
     const title = (row.title ?? "").trim();
     const synopsis = (row.synopsis ?? "").trim();
     const airDate = (row.air_date ?? "").trim();
+    // Tolerate "Clip Show" / "clip-show" in hand-written CSVs.
+    const episodeType = (row.episode_type ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 
     if (!Number.isInteger(num) || num < 1) {
         problems.push(`Line ${line}: invalid episode_number "${row.episode_number}"`);
@@ -71,10 +89,16 @@ rows.forEach((row, idx) => {
         problems.push(`Line ${line}: air_date must be YYYY-MM-DD ("${airDate}")`);
         return;
     }
+    if (episodeType && !EPISODE_TYPES.includes(episodeType)) {
+        problems.push(
+            `Line ${line}: episode_type must be one of ${EPISODE_TYPES.join(", ")} ("${row.episode_type}")`
+        );
+        return;
+    }
     if (!synopsis) {
         console.warn(`⚠ Line ${line} (episode ${num}): empty synopsis/recap`);
     }
-    episodes.push({ num, title, synopsis, airDate });
+    episodes.push({ num, title, synopsis, airDate, episodeType });
 });
 
 if (problems.length) {
@@ -92,15 +116,19 @@ const seriesRef = seriesId
     ? `'${seriesId}'::uuid`
     : `(select id from public.series where title = ${q(seriesTitle)})`;
 
-function rowSql({ num, title, synopsis, airDate }) {
+function rowSql({ num, title, synopsis, airDate, episodeType }) {
     const syn = synopsis ? q(synopsis) : "null";
     const air = airDate ? `${q(airDate)}::date` : "null::date";
+    const type = episodeType ? q(episodeType) : "null";
+    const cols = hasEpisodeTypeColumn ? ", episode_type" : "";
+    const vals = hasEpisodeTypeColumn ? `, ${type}` : "";
+    const update = hasEpisodeTypeColumn ? ",\n  episode_type = excluded.episode_type" : "";
     return (
-        `insert into public.episodes (series_id, episode_number, title, synopsis, air_date)\n` +
-        `select ${seriesRef}, ${num}, ${q(title)}, ${syn}, ${air}\n` +
+        `insert into public.episodes (series_id, episode_number, title, synopsis, air_date${cols})\n` +
+        `select ${seriesRef}, ${num}, ${q(title)}, ${syn}, ${air}${vals}\n` +
         `where ${seriesRef} is not null\n` +
         `on conflict (series_id, episode_number)\n` +
-        `do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;`
+        `do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date${update};`
     );
 }
 
@@ -154,6 +182,9 @@ async function pushDirect(eps) {
         title: e.title,
         synopsis: e.synopsis || null,
         air_date: e.airDate || null,
+        // Omitted entirely when the CSV has no episode_type column, so the
+        // upsert leaves any existing tag in place.
+        ...(hasEpisodeTypeColumn ? { episode_type: e.episodeType || null } : {}),
     }));
 
     const { error } = await supa

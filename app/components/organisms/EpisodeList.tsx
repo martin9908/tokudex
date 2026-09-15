@@ -5,11 +5,17 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import EpisodeCheckInModal from "./EpisodeCheckInModal";
 import { setEpisodeProgress } from "../../actions";
+import {
+    episodeTypeBadgeClass,
+    episodeTypeLabel,
+    isSkippableEpisodeType,
+} from "@/lib/episodeTypes";
 
 type Episode = {
     episode_number: number;
     title: string | null;
     synopsis: string | null;
+    episode_type?: string | null;
 };
 
 type EpisodeListProps = {
@@ -34,6 +40,7 @@ export default function EpisodeList({
     const [pending, setPending] = useState<number | null>(null);
     const [bulkPending, setBulkPending] = useState(false);
     const [confirmMarkAll, setConfirmMarkAll] = useState(false);
+    const [hideSkippable, setHideSkippable] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
     const nextRef = useRef<HTMLButtonElement>(null);
@@ -90,6 +97,32 @@ export default function EpisodeList({
         return map;
     }, [episodes]);
 
+    const typeByNumber = useMemo(() => {
+        const map = new Map<number, string>();
+        for (const entry of episodes) {
+            if (entry.episode_type) map.set(entry.episode_number, entry.episode_type);
+        }
+        return map;
+    }, [episodes]);
+
+    // Episode numbers the "hide filler" toggle can remove — filler, clip shows
+    // and recaps. Specials/crossovers stay visible; they're tagged for context.
+    const skippableNumbers = useMemo(() => {
+        const set = new Set<number>();
+        for (const [number, type] of typeByNumber) {
+            if (number <= totalEpisodes && isSkippableEpisodeType(type)) set.add(number);
+        }
+        return set;
+    }, [typeByNumber, totalEpisodes]);
+
+    const visibleNumbers = useMemo(() => {
+        const all = Array.from({ length: totalEpisodes }, (_, index) => index + 1);
+        return hideSkippable ? all.filter((number) => !skippableNumbers.has(number)) : all;
+    }, [totalEpisodes, hideSkippable, skippableNumbers]);
+
+    const nextEpisodeVisible = visibleNumbers.includes(currentEpisode + 1);
+    const showToolbar = skippableNumbers.size > 0 || (!guest && currentEpisode < totalEpisodes);
+
     return (
         <div>
             {error && (
@@ -112,58 +145,86 @@ export default function EpisodeList({
                 </div>
             )}
 
-            {!guest && currentEpisode < totalEpisodes && (
-                <div className="mb-3 flex flex-wrap justify-end gap-2">
-                    {totalEpisodes > 12 && (
-                        <button
-                            type="button"
-                            onClick={scrollToNext}
-                            className="tdx-focus-ring rounded-lg border border-cyan-900/60 px-3 py-1.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
-                        >
-                            Jump to Episode {currentEpisode + 1}
-                        </button>
-                    )}
-                    {confirmMarkAll ? (
-                        <div className="flex items-center gap-2 rounded-lg border border-warning/40 bg-[var(--warning)]/10 px-3 py-1.5">
-                            <span className="text-xs text-[var(--warning)]">
-                                Mark all {totalEpisodes} episodes as watched?
-                            </span>
-                            <button
-                                type="button"
-                                onClick={markAll}
-                                disabled={bulkPending}
-                                className="tdx-focus-ring rounded-md bg-[var(--warning)] px-2 py-0.5 text-xs font-semibold text-[#1a1000] hover:opacity-90 disabled:opacity-50 transition-opacity"
-                            >
-                                Confirm
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setConfirmMarkAll(false)}
-                                className="tdx-focus-ring rounded-md border border-cyan-900/60 px-2 py-0.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                        </div>
+            {showToolbar && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    {skippableNumbers.size > 0 ? (
+                        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-cyan-900/60 px-3 py-1.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={hideSkippable}
+                                onChange={(event) => setHideSkippable(event.target.checked)}
+                                className="tdx-focus-ring h-3.5 w-3.5 accent-cyan-400"
+                            />
+                            Hide filler &amp; clip shows ({skippableNumbers.size})
+                        </label>
                     ) : (
-                        <button
-                            type="button"
-                            onClick={() => setConfirmMarkAll(true)}
-                            disabled={bulkPending}
-                            className="tdx-focus-ring rounded-lg border border-cyan-600/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 transition-colors"
-                        >
-                            {bulkPending ? "Marking…" : "Mark all as watched"}
-                        </button>
+                        <span />
                     )}
+
+                    <div className="flex flex-wrap justify-end gap-2">
+                        {!guest && currentEpisode < totalEpisodes && (
+                            <>
+                                {totalEpisodes > 12 && nextEpisodeVisible && (
+                                    <button
+                                        type="button"
+                                        onClick={scrollToNext}
+                                        className="tdx-focus-ring rounded-lg border border-cyan-900/60 px-3 py-1.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
+                                    >
+                                        Jump to Episode {currentEpisode + 1}
+                                    </button>
+                                )}
+                                {confirmMarkAll ? (
+                                    <div className="flex items-center gap-2 rounded-lg border border-warning/40 bg-[var(--warning)]/10 px-3 py-1.5">
+                                        <span className="text-xs text-[var(--warning)]">
+                                            Mark all {totalEpisodes} episodes as watched?
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={markAll}
+                                            disabled={bulkPending}
+                                            className="tdx-focus-ring rounded-md bg-[var(--warning)] px-2 py-0.5 text-xs font-semibold text-[#1a1000] hover:opacity-90 disabled:opacity-50 transition-opacity"
+                                        >
+                                            Confirm
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmMarkAll(false)}
+                                            className="tdx-focus-ring rounded-md border border-cyan-900/60 px-2 py-0.5 text-xs font-medium text-cyan-200/80 hover:bg-cyan-500/10 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmMarkAll(true)}
+                                        disabled={bulkPending}
+                                        className="tdx-focus-ring rounded-lg border border-cyan-600/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 transition-colors"
+                                    >
+                                        {bulkPending ? "Marking…" : "Mark all as watched"}
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 
             <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {Array.from({ length: totalEpisodes }, (_, index) => {
-                    const episodeNumber = index + 1;
+                {visibleNumbers.map((episodeNumber) => {
                     const isWatched = episodeNumber <= currentEpisode;
                     const isNext = episodeNumber === currentEpisode + 1;
                     const isPending = pending === episodeNumber;
                     const title = titlesByNumber.get(episodeNumber) ?? null;
+                    const typeValue = typeByNumber.get(episodeNumber) ?? null;
+                    const typeLabel = episodeTypeLabel(typeValue);
+                    const typeBadge = typeLabel && (
+                        <span
+                            className={`mt-1.5 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${episodeTypeBadgeClass(typeValue)}`}
+                        >
+                            {typeLabel}
+                        </span>
+                    );
 
                     return (
                         <li key={episodeNumber}>
@@ -185,6 +246,7 @@ export default function EpisodeList({
                                                 {title}
                                             </p>
                                         )}
+                                        {typeBadge}
                                     </div>
                                 ) : (
                                     <>
@@ -213,6 +275,7 @@ export default function EpisodeList({
                                                     {title}
                                                 </p>
                                             )}
+                                            {typeBadge}
                                             <p className="mt-2 flex items-center gap-1 text-[11px] text-cyan-300/80">
                                                 Log with recap
                                                 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -249,6 +312,14 @@ export default function EpisodeList({
                 })}
             </ul>
 
+            {hideSkippable && skippableNumbers.size > 0 && (
+                <p className="mt-3 text-xs text-cyan-200/60">
+                    {skippableNumbers.size} filler / clip show{skippableNumbers.size === 1 ? "" : "s"}{" "}
+                    hidden — episode numbers still follow the original broadcast order, and your
+                    progress count is unchanged.
+                </p>
+            )}
+
             {!guest && openEpisode !== null && (
                 <EpisodeCheckInModal
                     key={openEpisode}
@@ -258,6 +329,7 @@ export default function EpisodeList({
                     episodeNumber={openEpisode}
                     episodeTitle={titlesByNumber.get(openEpisode) ?? null}
                     episodeSynopsis={synopsisByNumber.get(openEpisode) ?? null}
+                    episodeType={typeByNumber.get(openEpisode) ?? null}
                     onClose={() => setOpenEpisode(null)}
                 />
             )}

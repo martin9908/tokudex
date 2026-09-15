@@ -1,22 +1,22 @@
-episode_number,title,synopsis,air_date
-1,"The Red Gavan",,2026-02-15
-2,"Two Blades",,2026-02-22
-3,"Kiki and Koto",,2026-03-01
-4,"Underground Fortress",,2026-03-08
-5,"Sword and Bullet",,2026-03-15
-6,"The Phantom Thief Fade Appears",,2026-03-22
-7,"The Black Gavan",,2026-03-29
-8,"The Magic Bullet Hunter",,2026-04-05
-9,"Crisis in the Forensics Division",,2026-04-12
-10,"Gavan the Ninja, Part 1",,2026-04-19
-11,"Gavan the Ninja, Part 2",,2026-04-26
-12,"Samurai and Ninja",,2026-05-03
-13,"The Gavan Kidnapping",,2026-05-10
-14,"The Truth of the Universe",,2026-05-17
-15,"Patran's Decision",,2026-05-24
-16,"Space Express Runaway",,2026-05-31
-17,"For Your Smiles",,2026-06-07
-18,"A Precious Person",,2026-06-14
-19,"Koto and Kiki",,2026-06-21
-20,"For Love's Sake",,2026-06-28
-21,"Gavans, Assemble!",,2026-07-05
+episode_number,title,synopsis,air_date,episode_type
+1,"The Red Gavan",,2026-02-15,
+2,"Two Blades",,2026-02-22,
+3,"Kiki and Koto",,2026-03-01,
+4,"Underground Fortress",,2026-03-08,
+5,"Sword and Bullet",,2026-03-15,
+6,"The Phantom Thief Fade Appears",,2026-03-22,
+7,"The Black Gavan",,2026-03-29,
+8,"The Magic Bullet Hunter",,2026-04-05,
+9,"Crisis in the Forensics Division",,2026-04-12,
+10,"Gavan the Ninja, Part 1",,2026-04-19,
+11,"Gavan the Ninja, Part 2",,2026-04-26,
+12,"Samurai and Ninja",,2026-05-03,
+13,"The Gavan Kidnapping",,2026-05-10,
+14,"The Truth of the Universe",,2026-05-17,
+15,"Patran's Decision",,2026-05-24,
+16,"Space Express Runaway",,2026-05-31,
+17,"For Your Smiles",,2026-06-07,
+18,"A Precious Person",,2026-06-14,
+19,"Koto and Kiki",,2026-06-21,
+20,"For Love's Sake",,2026-06-28,
+21,"Gavans, Assemble!",,2026-07-05,
