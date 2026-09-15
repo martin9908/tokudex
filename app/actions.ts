@@ -41,6 +41,14 @@ export async function saveEpisodeCheckIn(
         noteEpisode: episodeNumber,
     });
 }
+/** Flip a movie between watched and plan-to-watch without touching its note. */
+export async function setMovieWatched(seriesId: string, watched: boolean) {
+    await saveTracking({
+        seriesId,
+        episode: watched ? 1 : 0,
+        status: watched ? "completed" : "plan_to_watch",
+    });
+}
 export async function saveMovieProgress(
     seriesId: string,
     watched: boolean,

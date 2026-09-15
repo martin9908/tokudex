@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCatalogPage } from "@/lib/catalogQueries";
-import SeriesLibrary from "./SeriesLibrary";
+import SeriesLibrary, { type LibraryProgress } from "./SeriesLibrary";
 export const metadata: Metadata = {
     title: "Library",
     description:
@@ -18,18 +18,21 @@ export default async function LibraryPage({
     const {
         data: { user },
     } = await client.auth.getUser();
-    let progress: Record<string, number> = {};
+    let progress: LibraryProgress = {};
     if (user && catalog.items.length) {
         const { data } = await client
             .from("user_series_progress")
-            .select("series_id,current_episode")
+            .select("series_id,current_episode,status")
             .eq("user_id", user.id)
             .in(
                 "series_id",
                 catalog.items.map((s) => s.id),
             );
         progress = Object.fromEntries(
-            (data ?? []).map((p) => [p.series_id, p.current_episode ?? 0]),
+            (data ?? []).map((p) => [
+                p.series_id,
+                { current: p.current_episode ?? 0, status: p.status ?? "watching" },
+            ]),
         );
     }
     return (
@@ -37,6 +40,7 @@ export default async function LibraryPage({
             series={catalog.items}
             {...catalog}
             progress={progress}
+            signedIn={Boolean(user)}
         />
     );
 }

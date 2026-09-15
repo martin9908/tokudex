@@ -14,14 +14,14 @@ export default function OpengraphImage() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "linear-gradient(135deg,#020913,#081b2b)",
-                color: "#ffffff",
+                background: "#272c37",
+                color: "#eceef2",
             }}
         >
-            <div style={{ fontSize: 104, fontWeight: 800, letterSpacing: -3 }}>
+            <div style={{ fontSize: 104, fontWeight: 500, letterSpacing: -3 }}>
                 TokuDex
             </div>
-            <div style={{ fontSize: 38, color: "#7fdfff", marginTop: 12 }}>
+            <div style={{ fontSize: 38, color: "#c2564e", marginTop: 12 }}>
                 Tokusatsu, Anime & Movies
             </div>
         </div>,

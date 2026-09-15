@@ -11,12 +11,14 @@ export default function LoginForm({
     signIn,
     signUp,
     forgotPassword,
+    initialMode = "signin",
 }: {
     signIn: Action;
     signUp: Action;
     forgotPassword: Action;
+    initialMode?: Mode;
 }) {
-    const [mode, setMode] = useState<Mode>("signin");
+    const [mode, setMode] = useState<Mode>(initialMode);
     const [isPending, startTransition] = useTransition();
     const [active, setActive] = useState<ActiveAction>(null);
 
@@ -41,44 +43,25 @@ export default function LoginForm({
         });
     }
 
-    const inputClass = "min-h-[44px] tdx-field px-3 py-2.5";
-
-    function tabClass(tab: Mode) {
-        return `min-h-[40px] rounded-lg text-sm font-semibold transition-colors ${
-            mode === tab
-                ? "bg-cyan-500/15 text-cyan-200 border border-cyan-600/40"
-                : "text-cyan-100/60 hover:text-cyan-100 border border-transparent"
-        }`;
-    }
-
     return (
         <div>
-            <div role="tablist" aria-label="Authentication" className="mb-5 grid grid-cols-2 gap-2">
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "signin"}
-                    onClick={() => setMode("signin")}
-                    className={tabClass("signin")}
-                >
-                    Sign in
-                </button>
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "signup"}
-                    onClick={() => setMode("signup")}
-                    className={tabClass("signup")}
-                >
-                    Sign up
-                </button>
-            </div>
+            {mode === "signup" && (
+                <>
+                    <p className="tdx-eyebrow">Create account</p>
+                    <h2 className="text-[19px] font-medium mt-1.5">Start your dex</h2>
+                    <p className="text-[12.5px] leading-[1.55] text-[var(--text-secondary)] mt-2 mb-4">
+                        Track every series, log episodes with a recap, and earn
+                        ranks as you go.
+                    </p>
+                </>
+            )}
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 {mode === "signup" && (
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor="name" className="text-sm font-medium text-cyan-100/90">
-                            Name
+                    <div>
+                        <label htmlFor="name" className="tdx-label">
+                            Display name{" "}
+                            <span className="tdx-label-hint">shown on shared cards</span>
                         </label>
                         <input
                             id="name"
@@ -86,14 +69,14 @@ export default function LoginForm({
                             type="text"
                             autoComplete="name"
                             maxLength={60}
-                            className={inputClass}
+                            className="tdx-field"
                             placeholder="Godai"
                         />
                     </div>
                 )}
 
-                <div className="flex flex-col gap-1.5">
-                    <label htmlFor="email" className="text-sm font-medium text-cyan-100/90">
+                <div>
+                    <label htmlFor="email" className="tdx-label">
                         Email
                     </label>
                     <input
@@ -102,14 +85,20 @@ export default function LoginForm({
                         type="email"
                         autoComplete="email"
                         required
-                        className={inputClass}
+                        className="tdx-field"
                         placeholder="you@example.com"
                     />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                    <label htmlFor="password" className="text-sm font-medium text-cyan-100/90">
+                <div>
+                    <label htmlFor="password" className="tdx-label">
                         Password
+                        {mode === "signup" && (
+                            <>
+                                {" "}
+                                <span className="tdx-label-hint">at least 8 characters</span>
+                            </>
+                        )}
                     </label>
                     <input
                         id="password"
@@ -117,7 +106,8 @@ export default function LoginForm({
                         type="password"
                         autoComplete={mode === "signin" ? "current-password" : "new-password"}
                         required
-                        className={inputClass}
+                        minLength={mode === "signup" ? 8 : undefined}
+                        className="tdx-field"
                         placeholder="••••••••"
                     />
                 </div>
@@ -126,7 +116,7 @@ export default function LoginForm({
                     type="submit"
                     disabled={isPending}
                     aria-busy={isPending && active === mode}
-                    className={buttonClasses({ variant: "primary", className: "mt-1" })}
+                    className={buttonClasses({ size: "lg", className: "mt-1 w-full min-h-[44px]" })}
                 >
                     {mode === "signin"
                         ? isPending && active === "signin"
@@ -137,43 +127,38 @@ export default function LoginForm({
                           : "Create account"}
                 </button>
 
-                {mode === "signin" && (
-                    <button
-                        type="button"
-                        onClick={handleForgot}
-                        disabled={isPending}
-                        className="tdx-focus-ring rounded-lg text-sm text-cyan-300/80 transition-colors hover:text-cyan-200 disabled:opacity-50"
-                    >
-                        {isPending && active === "reset" ? "Sending reset email…" : "Forgot password?"}
-                    </button>
-                )}
-            </form>
-
-            <p className="mt-5 text-center text-sm text-cyan-200/70">
-                {mode === "signin" ? (
-                    <>
-                        New to TokuDex?{" "}
-                        <button
-                            type="button"
-                            onClick={() => setMode("signup")}
-                            className="tdx-focus-ring rounded font-semibold text-cyan-300 hover:text-cyan-200"
-                        >
-                            Create an account
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        Already have an account?{" "}
+                <div className="flex justify-between items-center gap-3 text-xs mt-0.5">
+                    {mode === "signin" ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleForgot}
+                                disabled={isPending}
+                                className="tdx-focus-ring rounded text-[var(--accent-primary)] disabled:opacity-50"
+                            >
+                                {isPending && active === "reset"
+                                    ? "Sending reset email…"
+                                    : "Forgot password?"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMode("signup")}
+                                className="tdx-focus-ring rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                            >
+                                Create an account
+                            </button>
+                        </>
+                    ) : (
                         <button
                             type="button"
                             onClick={() => setMode("signin")}
-                            className="tdx-focus-ring rounded font-semibold text-cyan-300 hover:text-cyan-200"
+                            className="tdx-focus-ring rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-auto"
                         >
-                            Sign in
+                            Already have an account? Sign in
                         </button>
-                    </>
-                )}
-            </p>
+                    )}
+                </div>
+            </form>
         </div>
     );
 }

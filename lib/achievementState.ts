@@ -176,7 +176,7 @@ export type AchievementsView = {
     rankNext: Rank | null;
     milestones: Achievement[];
     collections: CollectionAchievement[];
-    seriesBadges: { key: string; name: string; earned: boolean }[];
+    seriesBadges: { key: string; name: string; series: string; earned: boolean }[];
     earnedAt: Record<string, string>; // earned key -> ISO timestamp
     earnedCount: number;
     totalCount: number;
@@ -208,6 +208,7 @@ export async function getAchievementsView(): Promise<AchievementsView | null> {
     const seriesBadges = SERIES_BADGES.map((b) => ({
         key: `series-${b.key}`,
         name: b.name,
+        series: b.series,
         earned: earnedBadgeKeys.has(b.key),
     }));
 

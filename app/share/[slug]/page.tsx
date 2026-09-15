@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getShareCard, shareEmoji } from "@/lib/share";
-import { LinkButton } from "../../components/atoms";
+import { Trophy, SealCheck, Medal } from "@phosphor-icons/react/ssr";
+import { getShareCard } from "@/lib/share";
+import { buttonClasses } from "../../components/atoms";
 import { SITE_NAME, absoluteUrl } from "@/lib/seo";
 
 type SharePageProps = {
@@ -29,42 +30,57 @@ export async function generateMetadata({ params }: SharePageProps): Promise<Meta
     };
 }
 
+/** Three card kinds, one layout: stats (trophy), series badge (seal), achievement (medal). */
+function KindIcon({ kind }: { kind: string }) {
+    const className = "mx-auto text-[var(--accent-primary)]";
+    if (kind === "series") return <SealCheck size={38} weight="fill" className={className} aria-hidden />;
+    if (kind === "stats" || kind === "rank") return <Trophy size={38} weight="fill" className={className} aria-hidden />;
+    return <Medal size={38} weight="fill" className={className} aria-hidden />;
+}
+
 export default async function SharePage({ params }: SharePageProps) {
     const { slug } = await params;
     const card = await getShareCard(slug);
     if (!card) notFound();
 
+    const headline =
+        card.stat_value && card.stat_label
+            ? `${card.stat_value} ${card.stat_label}`
+            : card.title;
+    const eyebrow =
+        card.stat_value && card.stat_label
+            ? `${card.subtitle ? card.subtitle.replace(/ on TokuDex$/, "") : "Rank"} · ${card.title}`
+            : card.subtitle;
+
     return (
-        <div className="max-w-lg mx-auto px-4 py-16 w-full">
-            <div className="tdx-panel p-8 text-center">
-                <p className="text-5xl mb-4" aria-hidden>
-                    {shareEmoji(card.kind)}
-                </p>
-                {card.subtitle && (
-                    <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80 mb-2">
-                        {card.subtitle}
+        <div className="max-w-[436px] mx-auto px-4 py-12 pb-24 w-full">
+            <div className="tdx-panel px-7 py-8 text-center">
+                <KindIcon kind={card.kind} />
+                {eyebrow && (
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--accent-primary)] mt-3.5">
+                        {eyebrow}
                     </p>
                 )}
-                <h1 className="text-3xl font-bold tracking-tight mb-3">{card.title}</h1>
-                {card.stat_value && (
-                    <p className="text-cyan-100/80 mb-1">
-                        <span className="text-2xl font-bold text-cyan-300">{card.stat_value}</span>{" "}
-                        {card.stat_label}
-                    </p>
-                )}
-                <p className="text-sm text-cyan-200/70 mt-4 mb-6">
-                    {card.display_name ?? "A TokuDex fan"} on {SITE_NAME} — the tokusatsu episode tracker.
+                <h1 className="text-[25px] font-medium tracking-[-0.02em] mt-2">
+                    {headline}
+                </h1>
+                <p className="text-[13px] text-[var(--text-secondary)] mt-2.5 leading-[1.5]">
+                    {card.display_name ?? "A TokuDex fan"} on {SITE_NAME} — the
+                    tokusatsu episode tracker.
                 </p>
-                <LinkButton href="/login" className="px-5">
+                <Link
+                    href="/login?mode=signup"
+                    className={buttonClasses({ size: "lg", className: "mt-5 px-5 min-h-[44px]" })}
+                >
                     Start tracking free
-                </LinkButton>
+                </Link>
+                <p className="mt-4 text-[11px] text-[var(--text-muted)]">
+                    <Link href="/" className="hover:text-[var(--text-primary)]">
+                        tokudex.app
+                    </Link>{" "}
+                    · track tokusatsu, earn achievements
+                </p>
             </div>
-            <p className="text-center text-xs text-cyan-200/55 mt-4">
-                <Link href="/" className="hover:text-cyan-200">
-                    {SITE_NAME}
-                </Link>{" "}
-                · track tokusatsu, earn achievements
-            </p>
         </div>
     );
 }

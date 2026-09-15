@@ -48,21 +48,19 @@ test("member submits, admin approves, member watches and rates a movie", async (
         await login(page, `member-${suffix}@example.com`);
         await page.goto("/community/new");
         await page.getByLabel("Title", { exact: true }).fill(title);
-        await page
-            .getByRole("combobox", { name: "Category", exact: true })
-            .selectOption("anime");
-        await page
-            .getByRole("combobox", { name: "Format", exact: true })
-            .selectOption("movie");
+        await page.getByRole("radio", { name: "Anime", exact: true }).check();
+        await page.getByRole("radio", { name: "Movie", exact: true }).check();
         await page.getByLabel("Release year").fill("2026");
-        await page.getByLabel("Runtime (minutes)").fill("90");
+        await page.getByLabel(/Runtime/).fill("90");
         await page
-            .getByLabel("HTTPS source links (one per line)")
+            .getByLabel(/HTTPS source links/)
             .fill("https://example.com/official");
         await page
             .getByRole("button", { name: "Check for existing titles" })
             .click();
-        await expect(page.getByText("No similar titles found.")).toBeVisible();
+        await expect(
+            page.getByText("Checked for existing titles — no close match."),
+        ).toBeVisible();
         await page
             .getByRole("button", { name: "Submit title", exact: true })
             .click();
@@ -71,32 +69,35 @@ test("member submits, admin approves, member watches and rates a movie", async (
         const admin = await adminContext.newPage();
         await login(admin, `admin-${suffix}@example.com`);
         await admin.goto("/admin");
-        await admin.locator("summary").filter({ hasText: title }).click();
+        await expect(admin.getByText(title, { exact: true })).toBeVisible();
         await admin
             .getByRole("button", { name: "Approve and publish" })
             .click();
-        await expect(admin.getByText("No pending submissions.")).toBeVisible();
+        await expect(admin.getByText("Nothing waiting here.")).toBeVisible();
         await page.reload();
-        await page.getByRole("link", { name: "View title →" }).click();
+        await page.getByRole("link", { name: title, exact: true }).click();
         await expect(page).toHaveURL(/\/series\/[0-9a-f-]{36}$/);
         titleId = page.url().split("/").at(-1);
         await expect(
             page.getByRole("heading", { name: title, exact: true }),
         ).toBeVisible();
         await page
-            .getByLabel("Private movie note")
-            .fill("A private ending recap.");
-        await page
-            .getByRole("button", { name: "Mark Watched", exact: true })
+            .getByRole("button", { name: "Watched", exact: true })
             .click();
         await expect(
-            page.getByRole("heading", { name: "Watched", exact: true }),
-        ).toBeVisible();
-        await page.getByLabel("Your rating", { exact: true }).selectOption("9");
+            page.getByRole("button", { name: "Watched", exact: true }),
+        ).toHaveAttribute("aria-pressed", "true");
         await page
-            .getByRole("button", { name: "Save rating", exact: true })
+            .getByLabel("Private note")
+            .fill("A private ending recap.");
+        await page
+            .getByRole("button", { name: "Save note", exact: true })
             .click();
-        await expect(page.getByText("9.0/10 · 1 rating")).toBeVisible();
+        await expect(page.getByText("Saved.")).toBeVisible();
+        await page.getByRole("radio", { name: "9 out of 10" }).click();
+        await expect(
+            page.getByText("Community average 9.0 from 1 rating"),
+        ).toBeVisible();
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto("/series?filter=movies");
         await expect(
@@ -113,7 +114,7 @@ test("member submits, admin approves, member watches and rates a movie", async (
         });
         await page.goto("/rankings?filter=movies");
         await expect(
-            page.getByText("No titles qualify yet.", { exact: false }),
+            page.getByText("No titles qualify yet", { exact: false }),
         ).toBeVisible();
         const guest = await browser.newPage();
         await guest.goto(`/series/${titleId}`);

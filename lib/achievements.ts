@@ -13,7 +13,7 @@ export type AchievementInput = {
 export type Rank = { title: string; min: number };
 
 // Themed ranks keyed off total episodes logged.
-const RANKS: Rank[] = [
+export const RANKS: Rank[] = [
     { title: "Newcomer", min: 0 },
     { title: "Rookie", min: 1 },
     { title: "Henshin Cadet", min: 25 },

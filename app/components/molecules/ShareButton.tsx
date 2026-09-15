@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { track } from "@vercel/analytics";
 import { createShareCard } from "../../actions";
-import { buttonClasses } from "../atoms";
+import { ShareNetwork } from "@phosphor-icons/react";
+import { buttonClasses, type ButtonVariant } from "../atoms";
 
 type ShareButtonProps = {
     /** Earned achievement key (e.g. "series-w", "col-forever-red") or "stats". */
@@ -15,6 +16,7 @@ type ShareButtonProps = {
     /** Text used in the tweet/native share. */
     text?: string;
     size?: "sm" | "md";
+    variant?: ButtonVariant;
     className?: string;
 };
 
@@ -26,6 +28,7 @@ export default function ShareButton({
     label = "Share",
     text = DEFAULT_TEXT,
     size = "sm",
+    variant = "primary",
     className = "",
 }: ShareButtonProps) {
     const [pending, startTransition] = useTransition();
@@ -74,9 +77,10 @@ export default function ShareButton({
                 type="button"
                 onClick={handleShare}
                 disabled={pending}
-                className={buttonClasses({ variant: "primary", size })}
+                className={buttonClasses({ variant, size })}
             >
-                {pending ? "Sharing…" : copied ? "Link copied ✓" : label}
+                <ShareNetwork size={14} aria-hidden />
+                {pending ? "Sharing…" : copied ? "Link copied" : label}
             </button>
             {url && (
                 <>
@@ -100,7 +104,11 @@ export default function ShareButton({
                     </a>
                 </>
             )}
-            {error && <span className="text-xs text-red-300">{error}</span>}
+            {error && (
+                <span role="alert" className="text-xs text-[var(--warning)]">
+                    {error}
+                </span>
+            )}
         </div>
     );
 }

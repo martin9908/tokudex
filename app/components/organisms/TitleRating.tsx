@@ -1,80 +1,153 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { LockSimple } from "@phosphor-icons/react";
 import { rateTitle } from "@/app/community/actions";
 import { buttonClasses } from "@/app/components/atoms";
+
+/**
+ * Private 1–10 rating as a row of dots. Tapping a dot saves immediately.
+ * When the member isn't eligible yet, the control is replaced by the thing
+ * that unlocks it rather than shown disabled.
+ */
 export default function TitleRating({
     id,
     initialScore,
     eligible,
+    unlockLabel,
+    onUnlock,
+    community,
 }: {
     id: string;
     initialScore: number | null;
     eligible: boolean;
+    /** Button text for the gate, e.g. "Log episode 1" or "Mark watched". */
+    unlockLabel: string;
+    /** Where the gate button goes (a /watch URL or the detail page anchor). */
+    onUnlock: string;
+    community: { average: number; votes: number } | null;
 }) {
-    const [score, setScore] = useState(String(initialScore ?? 8));
-    const [busy, setBusy] = useState(false);
+    const router = useRouter();
+    const [score, setScore] = useState<number | null>(initialScore);
+    const [hover, setHover] = useState<number | null>(null);
     const [error, setError] = useState("");
-    async function save(value: number | null) {
-        setBusy(true);
+    const [busy, startTransition] = useTransition();
+
+    function save(value: number | null) {
         setError("");
-        try {
-            await rateTitle(id, value);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Could not save rating.");
-        } finally {
-            setBusy(false);
-        }
+        const previous = score;
+        setScore(value);
+        startTransition(async () => {
+            try {
+                await rateTitle(id, value);
+                router.refresh();
+            } catch (e) {
+                setScore(previous);
+                setError(e instanceof Error ? e.message : "Could not save rating.");
+            }
+        });
     }
+
+    const communityLine = community ? (
+        <p className="text-xs text-[var(--text-secondary)]">
+            Community average{" "}
+            <span className="text-[var(--text-primary)] font-medium">
+                {community.average.toFixed(1)}
+            </span>{" "}
+            from {community.votes} {community.votes === 1 ? "rating" : "ratings"}
+        </p>
+    ) : (
+        <p className="text-xs text-[var(--text-secondary)]">
+            Not enough ratings to show an average yet — five make it public.
+        </p>
+    );
+
+    if (!eligible) {
+        return (
+            <section className="tdx-panel p-3.5">
+                <div className="flex items-baseline gap-2">
+                    <span className="tdx-eyebrow tdx-eyebrow-accent">Your rating</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                        private — only the average is public
+                    </span>
+                </div>
+                <div className="mt-3 p-3.5 rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface)]">
+                    <div className="flex items-center gap-2.5 text-[13px]">
+                        <LockSimple size={17} className="text-[var(--text-muted)]" />
+                        {initialScore !== null
+                            ? "Your rating is kept but held back from the average until you're eligible again"
+                            : "Log an episode to rate this"}
+                    </div>
+                    <a
+                        href={onUnlock}
+                        className={buttonClasses({ className: "mt-3 w-full" })}
+                    >
+                        {unlockLabel}
+                    </a>
+                </div>
+                <div className="mt-3 pt-3 border-t border-[var(--line)]">
+                    {communityLine}
+                </div>
+            </section>
+        );
+    }
+
+    const shown = hover ?? score ?? 0;
+
     return (
-        <div className="space-y-2">
-            {eligible ? (
-                <div className="flex flex-wrap items-center gap-3">
-                    <label className="text-sm text-[var(--text-secondary)]">
-                        Your rating{" "}
-                        <select
-                            aria-label="Your rating"
-                            className="tdx-field p-2 inline-block w-auto text-[var(--text-primary)]"
-                            value={score}
-                            onChange={(e) => setScore(e.target.value)}
-                        >
-                            {Array.from({ length: 10 }, (_, i) => (
-                                <option key={i + 1}>{i + 1}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <button
-                        className={buttonClasses({ variant: "secondary", size: "sm" })}
-                        disabled={busy}
-                        onClick={() => save(Number(score))}
-                    >
-                        Save rating
-                    </button>
+        <section className="tdx-panel p-3.5">
+            <div className="flex items-baseline gap-2">
+                <span className="tdx-eyebrow tdx-eyebrow-accent">Your rating</span>
+                <span className="text-[11px] text-[var(--text-muted)]">
+                    private — only the average is public
+                </span>
+            </div>
+            <div className="flex items-center gap-3.5 mt-3 flex-wrap">
+                <div
+                    role="radiogroup"
+                    aria-label="Your rating out of 10"
+                    className="flex gap-1.5"
+                    onMouseLeave={() => setHover(null)}
+                >
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                        <button
+                            key={n}
+                            type="button"
+                            role="radio"
+                            aria-checked={score === n}
+                            aria-label={`${n} out of 10`}
+                            disabled={busy}
+                            onMouseEnter={() => setHover(n)}
+                            onFocus={() => setHover(n)}
+                            onBlur={() => setHover(null)}
+                            onClick={() => save(n)}
+                            className={`tdx-dot tdx-focus-ring ${n <= shown ? "is-on" : ""}`}
+                        />
+                    ))}
                 </div>
-            ) : (
-                <div className="rounded-lg border border-dashed border-[var(--line)] p-3.5 flex items-center gap-2.5 text-sm text-[var(--text-secondary)]">
-                    <LockSimple size={16} className="text-[var(--text-muted)]" />
-                    Start this series or mark this movie watched to rate it.
-                </div>
-            )}
-            {initialScore !== null && (
-                <div className="text-sm text-[var(--text-secondary)]">
-                    <p>
-                        Your saved score: {initialScore}/10
-                        {!eligible ? " (excluded until you watch again)" : ""}
-                    </p>
+                <span className="text-[15px] font-medium">
+                    {shown > 0 ? shown : "–"}
+                    <span className="text-[var(--text-muted)] font-normal">/10</span>
+                </span>
+                {score !== null && (
                     <button
-                        className="tdx-focus-ring underline text-[var(--accent-primary)]"
-                        disabled={busy}
+                        type="button"
                         onClick={() => save(null)}
+                        disabled={busy}
+                        className="tdx-focus-ring ml-auto text-[11.5px] text-[var(--accent-primary)] rounded"
                     >
-                        Remove rating
+                        Clear rating
                     </button>
-                </div>
+                )}
+            </div>
+            {error && (
+                <p role="alert" className="mt-2 text-xs text-[var(--warning)]">
+                    {error}
+                </p>
             )}
-            <p role="status" className="text-sm text-[var(--warning)]">
-                {error}
-            </p>
-        </div>
+            <div className="mt-3 pt-3 border-t border-[var(--line)]">
+                {communityLine}
+            </div>
+        </section>
     );
 }

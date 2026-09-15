@@ -1,14 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "@phosphor-icons/react";
 import { addSeriesToTracker } from "../../actions";
+import { buttonClasses } from "../atoms";
 
 type AddSeriesButtonProps = {
     seriesId: string;
     className?: string;
 };
 
-export default function AddSeriesButton({ seriesId, className = "" }: AddSeriesButtonProps) {
+export default function AddSeriesButton({
+    seriesId,
+    className = "",
+}: AddSeriesButtonProps) {
+    const router = useRouter();
     const [added, setAdded] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -19,23 +26,29 @@ export default function AddSeriesButton({ seriesId, className = "" }: AddSeriesB
             try {
                 await addSeriesToTracker(seriesId);
                 setAdded(true);
+                router.refresh();
             } catch {
-                setError("Could not add series. Please try again.");
+                setError("Could not add this title. Please try again.");
             }
         });
     }
 
     return (
-        <div>
+        <div className={className}>
             <button
                 type="button"
                 onClick={handleClick}
                 disabled={pending || added}
-                className={`inline-flex w-full justify-center rounded-xl bg-cyan-500/90 hover:bg-cyan-400 text-[#031018] px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${className}`}
+                className={buttonClasses()}
             >
-                {added ? "Added to Tracker" : pending ? "Adding…" : "+ Add to My Tracker"}
+                <Plus size={14} aria-hidden />
+                {added ? "Added to tracker" : pending ? "Adding…" : "Add to tracker"}
             </button>
-            {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+            {error && (
+                <p role="alert" className="mt-2 text-xs text-[var(--warning)]">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
