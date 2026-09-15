@@ -1,120 +1,104 @@
 import Link from "next/link";
+import LegalPage from "../components/organisms/LegalPage";
 
 export const metadata = {
-    title: "Privacy Policy — TokuDex",
+    title: "Privacy",
 };
 
 // NOTE: This is a starting-point policy for an MVP, not legal advice. Review it
-// (and have it checked) before relying on it for a public launch. Fill in the
-// contact email and effective date.
+// (and have it checked) before relying on it for a public launch.
 export default function PrivacyPage() {
     return (
-        <div className="max-w-2xl mx-auto px-4 py-10 pb-24 md:pb-10 w-full">
-            <Link
-                href="/"
-                className="text-sm text-cyan-300 hover:text-cyan-200"
-            >
-                ← Back
-            </Link>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight">
-                Privacy Policy
-            </h1>
-            <p className="mt-1 text-sm text-cyan-200/60">
-                Last updated: 14 September 2026
-            </p>
-
-            <div className="mt-6 space-y-6 text-sm leading-relaxed text-cyan-100/85">
-                <section>
-                    <h2 className="text-lg font-semibold text-cyan-50 mb-2">
-                        What we collect
-                    </h2>
-                    <ul className="list-disc pl-5 space-y-1 text-cyan-100/80">
-                        <li>
-                            Your email address and (optionally) a display name.
-                        </li>
-                        <li>
-                            Your password, stored only as a salted hash by our
-                            auth provider — we never see it.
-                        </li>
-                        <li>
-                            Your tracking data: which titles you track, episode
-                            progress, movie watch status, and private recap
-                            notes.
-                        </li>
-                        <li>
-                            Your ratings, catalog submissions and source links,
-                            content reports, and any publishing-trust grant and
-                            expiry.
-                        </li>
-                        <li>
-                            Basic, privacy-friendly usage analytics (aggregate
-                            page views) with no advertising cookies.
-                        </li>
-                    </ul>
-                </section>
-
-                <section>
-                    <h2 className="text-lg font-semibold text-cyan-50 mb-2">
-                        How we use it
-                    </h2>
-                    <p>
-                        Solely to provide TokuDex: authenticating you, saving
-                        your progress and notes, and improving the product. We
-                        do not sell your data or share it with advertisers.
-                    </p>
-                </section>
-
-                <section>
-                    <h2 className="text-lg font-semibold text-cyan-50 mb-2">
-                        Where it lives
-                    </h2>
-                    <p>
-                        Data is stored with our infrastructure providers
-                        (Supabase for the database and authentication; Vercel
-                        for hosting). Progress, notes, and individual ratings
-                        are restricted to your account. Rating averages and
-                        counts are public. Published catalog contributions are
-                        public; administrators can review submissions, reports,
-                        revision history, and publishing-trust records.
-                    </p>
-                </section>
-
-                <section>
-                    <h2 className="text-lg font-semibold text-cyan-50 mb-2">
-                        Your control
-                    </h2>
-                    <p>
-                        You can edit your name and password, and permanently
-                        delete your account at any time from your{" "}
-                        <Link
-                            href="/account"
-                            className="text-cyan-300 hover:text-cyan-200"
-                        >
-                            account page
-                        </Link>
-                        . Deleting your account erases your progress, notes,
-                        ratings, and profile. Catalog contributions and
-                        moderation history remain, with their account
-                        attribution removed.
-                    </p>
-                </section>
-
-                <section>
-                    <h2 className="text-lg font-semibold text-cyan-50 mb-2">
-                        Contact
-                    </h2>
-                    <p>
-                        Questions about your data? Contact us at{" "}
-                        <a
-                            href="mailto:mjhalumsolutions@gmail.com"
-                            className="text-cyan-300 hover:text-cyan-200"
-                        >
-                            mjhalumsolutions@gmail.com
-                        </a>
-                        .
-                    </p>
-                </section>
-            </div>
-        </div>
+        <LegalPage
+            title="Privacy"
+            updated="14 September 2026"
+            sections={[
+                {
+                    heading: "What we store",
+                    body: (
+                        <>
+                            <p>
+                                An email address, an optional display name, and
+                                your tracking data: which titles you track,
+                                episode progress and when you logged it, your
+                                statuses, your private notes and your ratings.
+                            </p>
+                            <p>
+                                Your password is stored only as a salted hash by
+                                our auth provider — we never see it. Catalog
+                                submissions, source links, content reports and
+                                any publishing-trust grant are kept with your
+                                account. Usage analytics are aggregate page
+                                views with no advertising cookies.
+                            </p>
+                        </>
+                    ),
+                },
+                {
+                    heading: "What stays private",
+                    body: (
+                        <>
+                            <p>
+                                Your notes and your individual ratings are never
+                                shown to anyone else, and never appear on a share
+                                card. Only aggregate numbers — averages, vote
+                                counts, rankings — are public.
+                            </p>
+                            <p>
+                                Your display name appears on share cards you
+                                create yourself and nowhere else. Administrators
+                                can review submissions, reports, revision history
+                                and publishing-trust records.
+                            </p>
+                        </>
+                    ),
+                },
+                {
+                    heading: "Where it lives",
+                    body: (
+                        <p>
+                            Data is stored with our infrastructure providers —
+                            Supabase for the database and authentication, Vercel
+                            for hosting. We do not sell your data or share it
+                            with advertisers.
+                        </p>
+                    ),
+                },
+                {
+                    heading: "Guests",
+                    body: (
+                        <p>
+                            Without an account you can browse the catalog, but
+                            nothing is recorded. Ratings, rankings and
+                            achievements need an account.
+                        </p>
+                    ),
+                },
+                {
+                    heading: "Email",
+                    body: (
+                        <p>
+                            We send account email only — sign-in links and
+                            password resets. Submission decisions reach you
+                            in-app on My submissions.
+                        </p>
+                    ),
+                },
+                {
+                    heading: "Deletion",
+                    body: (
+                        <p>
+                            You can edit your name and password, and permanently
+                            delete your account at any time from your{" "}
+                            <Link href="/account">account page</Link>. Deleting
+                            your account removes your rows for good, including
+                            the ratings behind public averages. Catalog
+                            contributions and moderation history remain, with
+                            their account attribution removed.
+                        </p>
+                    ),
+                },
+            ]}
+        />
     );
 }

@@ -54,8 +54,8 @@ export default async function SeriesOpengraphImage({
                 width: "100%",
                 height: "100%",
                 display: "flex",
-                background: "linear-gradient(135deg,#020913,#081b2b)",
-                color: "#ffffff",
+                background: "#272c37",
+                color: "#eceef2",
                 padding: 64,
             }}
         >
@@ -71,7 +71,7 @@ export default async function SeriesOpengraphImage({
                     style={{
                         fontSize: 26,
                         letterSpacing: 6,
-                        color: "#7fdfff",
+                        color: "#c2564e",
                         textTransform: "uppercase",
                     }}
                 >
@@ -80,7 +80,7 @@ export default async function SeriesOpengraphImage({
                 <div
                     style={{
                         fontSize: 68,
-                        fontWeight: 800,
+                        fontWeight: 500,
                         lineHeight: 1.05,
                         marginTop: 16,
                     }}
@@ -91,14 +91,14 @@ export default async function SeriesOpengraphImage({
                     <div
                         style={{
                             fontSize: 32,
-                            color: "#cfefff",
+                            color: "#99a1b0",
                             marginTop: 24,
                         }}
                     >
                         {episodes}
                     </div>
                 ) : null}
-                <div style={{ fontSize: 28, color: "#7fdfff", marginTop: 40 }}>
+                <div style={{ fontSize: 28, color: "#c2564e", marginTop: 40 }}>
                     Track it on TokuDex
                 </div>
             </div>

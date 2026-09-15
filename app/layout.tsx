@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -9,6 +10,7 @@ import AchievementToaster from "./components/organisms/AchievementToaster";
 import JsonLd from "./components/JsonLd";
 import { getEarnedAchievements } from "@/lib/achievementState";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, absoluteUrl } from "@/lib/seo";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 
 const bodyFont = Inter({
     variable: "--font-body",
@@ -60,7 +62,7 @@ export const viewport: Viewport = {
     width: "device-width",
     initialScale: 1,
     viewportFit: "cover",
-    themeColor: "#060b13",
+    themeColor: "#1f232c",
 };
 
 export default async function RootLayout({
@@ -68,11 +70,16 @@ export default async function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
-    const achievementState = await getEarnedAchievements();
+    const [achievementState, cookieStore] = await Promise.all([
+        getEarnedAchievements(),
+        cookies(),
+    ]);
+    const theme = parseTheme(cookieStore.get(THEME_COOKIE)?.value);
 
     return (
         <html
             lang="en"
+            data-theme={theme ?? undefined}
             className={`${bodyFont.variable} ${headingFont.variable} h-full antialiased`}
         >
             <body className="min-h-full flex flex-col bg-background text-foreground">

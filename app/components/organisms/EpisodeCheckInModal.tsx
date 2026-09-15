@@ -5,10 +5,9 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveEpisodeCheckIn } from "../../actions";
 import { NOTE_MAX_LENGTH } from "@/lib/validation";
-import { episodeTypeBadgeClass, episodeTypeLabel } from "@/lib/episodeTypes";
+import { episodeTypeLabel } from "@/lib/episodeTypes";
 import { buttonClasses } from "../atoms";
-
-type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
+import StatusChoice, { type ProgressStatus } from "../molecules/StatusChoice";
 
 type EpisodeCheckInModalProps = {
     open: boolean;
@@ -23,6 +22,11 @@ type EpisodeCheckInModalProps = {
     onSaved?: () => void;
 };
 
+/**
+ * Episode check-in sheet: a note (optional) and the series status, saved in
+ * one transaction with the progress update. Slides up from the bottom on
+ * phones and sits centred on larger screens.
+ */
 export default function EpisodeCheckInModal({
     open,
     initialNote = "",
@@ -37,7 +41,6 @@ export default function EpisodeCheckInModal({
 }: EpisodeCheckInModalProps) {
     const router = useRouter();
     const noteId = useId();
-    const statusId = useId();
 
     const [note, setNote] = useState(initialNote);
     const [status, setStatus] = useState<ProgressStatus>("watching");
@@ -75,7 +78,7 @@ export default function EpisodeCheckInModal({
             onClose();
         } catch (err) {
             setError(
-                err instanceof Error ? err.message : "Failed to save check-in",
+                err instanceof Error ? err.message : "That check-in didn't save",
             );
             setSaving(false);
         }
@@ -83,147 +86,93 @@ export default function EpisodeCheckInModal({
 
     if (!open || typeof document === "undefined") return null;
 
+    const typeLabel = episodeTypeLabel(episodeType);
+
     return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#01060dcc] backdrop-blur-sm p-0 sm:p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[var(--shade)] p-0 sm:p-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="episode-check-in-title"
             onClick={saving ? undefined : onClose}
         >
             <div
-                className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-cyan-900/45 bg-[#12202f]/95 p-4 sm:p-5"
+                className="w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-xl sm:rounded-lg border border-[var(--line)] bg-[var(--surface)] px-[18px] pt-2.5 pb-6 sm:p-6"
                 onClick={(event) => event.stopPropagation()}
             >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/70 mb-1">
-                            Episode Check-in
-                        </p>
-                        <h2
-                            id="episode-check-in-title"
-                            className="text-2xl font-bold leading-tight"
-                        >
-                            {seriesTitle}
-                        </h2>
-                        <p className="text-cyan-100/75 text-sm mt-1">
-                            Episode {episodeNumber}
-                            {episodeTitle ? ` · ${episodeTitle}` : ""}
-                        </p>
-                        {episodeTypeLabel(episodeType) && (
-                            <span
-                                className={`mt-1.5 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${episodeTypeBadgeClass(episodeType)}`}
-                            >
-                                {episodeTypeLabel(episodeType)}
-                            </span>
-                        )}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={saving}
-                        className="tdx-focus-ring rounded-lg border border-cyan-900/60 px-2 py-1 text-sm text-cyan-100 hover:bg-cyan-500/10 disabled:opacity-50"
-                        aria-label="Close episode check-in"
-                    >
-                        Close
-                    </button>
-                </div>
-
-                {error && (
-                    <p className="mb-4 rounded-xl border border-red-900/45 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                        {error}
-                    </p>
-                )}
-
-                <p className="mb-4 text-sm text-cyan-100/70">
-                    Mark how far you&apos;ve watched and jot a recap so you
-                    remember what happened next time.
+                <div
+                    aria-hidden
+                    className="sm:hidden mx-auto mb-3.5 h-1 w-9 rounded-[2px] bg-[var(--line)]"
+                />
+                <p className="tdx-eyebrow tdx-eyebrow-accent">Episode check-in</p>
+                <h2
+                    id="episode-check-in-title"
+                    className="text-[19px] font-medium leading-[1.2] mt-1.5"
+                >
+                    {seriesTitle}
+                </h2>
+                <p className="text-[12.5px] text-[var(--text-secondary)] mt-1">
+                    Episode {episodeNumber}
+                    {episodeTitle ? ` · ${episodeTitle}` : ""}
+                    {typeLabel && (
+                        <span className="tdx-chip ml-2 text-[9.5px] py-0.5">
+                            {typeLabel}
+                        </span>
+                    )}
                 </p>
 
                 {episodeSynopsis && (
-                    <div className="mb-4 rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3">
-                        <p className="text-[11px] uppercase tracking-wider text-cyan-300/70 mb-1">
-                            Episode recap
-                        </p>
-                        <p className="text-sm text-cyan-100/85 leading-relaxed">
-                            {episodeSynopsis}
-                        </p>
+                    <p className="mt-3 text-[12.5px] leading-[1.55] text-[var(--text-secondary)]">
+                        {episodeSynopsis}
+                    </p>
+                )}
+
+                {error && (
+                    <div className="tdx-callout tdx-callout-warn mt-3.5">
+                        {error}
                     </div>
                 )}
 
-                <div className="space-y-4">
-                    <div>
-                        <label
-                            htmlFor={noteId}
-                            className="text-sm font-medium text-cyan-100/90 block mb-2"
-                        >
-                            Quick recap note
-                        </label>
-                        <textarea
-                            id={noteId}
-                            rows={4}
-                            value={note}
-                            maxLength={NOTE_MAX_LENGTH}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="What happened in this episode?"
-                            className="tdx-field px-3 py-2.5"
-                        />
-                        <p className="mt-1 text-right text-xs text-cyan-200/75">
+                <div className="mt-3.5">
+                    <label htmlFor={noteId} className="tdx-label">
+                        What happened?
+                    </label>
+                    <textarea
+                        id={noteId}
+                        rows={4}
+                        value={note}
+                        maxLength={NOTE_MAX_LENGTH}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="A line or two so you remember next time"
+                        className="tdx-field tdx-field-sunk min-h-[104px] text-[13px] leading-[1.5]"
+                    />
+                    <div className="flex justify-between mt-1.5 text-[11px] text-[var(--text-muted)]">
+                        <span>Optional — you can log without one</span>
+                        <span>
                             {note.length}/{NOTE_MAX_LENGTH}
-                        </p>
-                    </div>
-
-                    <div>
-                        <label
-                            htmlFor={statusId}
-                            className="text-sm font-medium text-cyan-100/90 block mb-2"
-                        >
-                            Status
-                        </label>
-                        <div className="relative">
-                            <select
-                                id={statusId}
-                                value={status}
-                                onChange={(e) =>
-                                    setStatus(e.target.value as ProgressStatus)
-                                }
-                                className="tdx-field appearance-none px-3 py-2.5 pr-10"
-                            >
-                                <option value="watching">Watching</option>
-                                <option value="completed">Completed</option>
-                                <option value="on_hold">On Hold</option>
-                                <option value="plan_to_watch">
-                                    Plan to Watch
-                                </option>
-                            </select>
-                            <svg
-                                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-300"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                aria-hidden
-                            >
-                                <path
-                                    d="M6 9l6 6 6-6"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
-                        </div>
+                        </span>
                     </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-3">
+                <div className="mt-3.5">
+                    <p className="tdx-label mb-2">Status</p>
+                    <StatusChoice
+                        value={status}
+                        onChange={setStatus}
+                        columns={2}
+                        disabled={saving}
+                    />
+                </div>
+
+                <div className="flex gap-2.5 mt-[18px]">
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={saving}
                         className={buttonClasses({
                             variant: "secondary",
-                            className: "flex-1 min-w-[150px]",
+                            size: "lg",
+                            className: "flex-1",
                         })}
                     >
                         Cancel
@@ -233,11 +182,11 @@ export default function EpisodeCheckInModal({
                         onClick={handleSave}
                         disabled={saving}
                         className={buttonClasses({
-                            variant: "primary",
-                            className: "flex-1 min-w-[150px]",
+                            size: "lg",
+                            className: "flex-[2]",
                         })}
                     >
-                        {saving ? "Saving..." : "Save and Mark Watched"}
+                        {saving ? "Saving…" : "Save & mark watched"}
                     </button>
                 </div>
             </div>

@@ -1,9 +1,10 @@
-export { default as SeriesCard } from "./SeriesCard";
 export { default as SupportBanner } from "./SupportBanner";
 export { default as SupportLink } from "./SupportLink";
 export { default as AddSeriesButton } from "./AddSeriesButton";
 export { default as ChangeStatusSelect } from "./ChangeStatusSelect";
 export { default as ResumeButton } from "./ResumeButton";
-export { default as MarkDoneButton } from "./MarkDoneButton";
 export { default as ShareButton } from "./ShareButton";
 export { default as SignOutButton } from "./SignOutButton";
+export { default as ThemeToggle } from "./ThemeToggle";
+export { default as MarkWatchedButton } from "./MarkWatchedButton";
+export { default as NavLinks } from "./NavLinks";

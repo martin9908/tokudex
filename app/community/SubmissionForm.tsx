@@ -2,12 +2,16 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Info } from "@phosphor-icons/react";
 import { submitTitle, findDuplicates, reviewSubmission } from "./actions";
 import {
     validateCatalogPayload,
     type CatalogPayload,
     type CatalogEpisode,
 } from "@/lib/catalog";
+import { EPISODE_TYPES, EPISODE_TYPE_LABELS } from "@/lib/episodeTypes";
+import { buttonClasses } from "@/app/components/atoms";
+
 const empty: CatalogPayload = {
     title: "",
     category: "tokusatsu",
@@ -19,18 +23,65 @@ const empty: CatalogPayload = {
     runtime_minutes: null,
     episodes: [],
 };
+
+const DAILY_LIMIT = 10;
+
+function Choice<T extends string>({
+    options,
+    value,
+    onChange,
+    disabled,
+    name,
+}: {
+    options: { value: T; label: string; disabled?: boolean }[];
+    value: T;
+    onChange: (v: T) => void;
+    disabled?: boolean;
+    name: string;
+}) {
+    return (
+        <div role="radiogroup" className="flex gap-1.5">
+            {options.map((o) => (
+                <label
+                    key={o.value}
+                    className={`tdx-choice flex-1 ${value === o.value ? "is-active" : ""} ${
+                        disabled || o.disabled ? "opacity-60 cursor-default" : ""
+                    }`}
+                >
+                    <input
+                        type="radio"
+                        name={name}
+                        value={o.value}
+                        className="sr-only"
+                        checked={value === o.value}
+                        disabled={disabled || o.disabled}
+                        onChange={() => onChange(o.value)}
+                    />
+                    {o.label}
+                </label>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * Add a title, or suggest a correction to one. The same form serves admin
+ * review ("edit then publish") when `reviewId` is given.
+ */
 export default function SubmissionForm({
     initial = empty,
     initialSources = [],
     seriesId,
     revision,
     reviewId,
+    attemptsToday = 0,
 }: {
     initial?: CatalogPayload;
     initialSources?: string[];
     seriesId?: string;
     revision?: number;
     reviewId?: string;
+    attemptsToday?: number;
 }) {
     const [payload, setPayload] = useState(initial);
     const [sources, setSources] = useState(initialSources.join("\n"));
@@ -40,6 +91,9 @@ export default function SubmissionForm({
         ReturnType<typeof findDuplicates>
     > | null>(null);
     const router = useRouter();
+    const correction = Boolean(seriesId) && !reviewId;
+    const locked = Boolean(seriesId);
+
     function field<K extends keyof CatalogPayload>(
         key: K,
         value: CatalogPayload[K],
@@ -58,9 +112,26 @@ export default function SubmissionForm({
             ),
         );
     }
+    async function checkDuplicates() {
+        try {
+            setDuplicates(
+                await findDuplicates(
+                    payload.title,
+                    payload.category,
+                    payload.format,
+                    payload.release_year,
+                ),
+            );
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Search failed");
+        }
+    }
+
+    const nearMatches = (duplicates ?? []).filter((s) => s.id !== seriesId);
+
     return (
         <form
-            className="tdx-panel p-5 space-y-5"
+            className="flex flex-col gap-3.5"
             onSubmit={async (event) => {
                 event.preventDefault();
                 const links = sources
@@ -96,16 +167,17 @@ export default function SubmissionForm({
                 }
             }}
         >
-            <p>
-                Write your own summary and link reliable sources. Regular
-                submissions need review; active trusted contributors publish
-                directly. Limit: ten submission attempts per day.
-            </p>
-            <fieldset disabled={busy} className="space-y-4">
-                <label className="block">
-                    Title
+            <fieldset
+                disabled={busy}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+            >
+                <div className="sm:col-span-2">
+                    <label htmlFor="sub-title" className="tdx-label">
+                        Title
+                    </label>
                     <input
-                        className="tdx-field p-3 mt-1"
+                        id="sub-title"
+                        className="tdx-field"
                         required
                         maxLength={300}
                         value={payload.title}
@@ -113,139 +185,143 @@ export default function SubmissionForm({
                             field("title", e.target.value);
                             setDuplicates(null);
                         }}
+                        onBlur={() => {
+                            if (!correction && payload.title.trim().length >= 2)
+                                checkDuplicates();
+                        }}
                     />
-                </label>
-                <button
-                    type="button"
-                    className="tdx-focus-ring underline"
-                    onClick={async () => {
-                        try {
-                            setDuplicates(
-                                await findDuplicates(
-                                    payload.title,
-                                    payload.category,
-                                    payload.format,
-                                    payload.release_year,
-                                ),
-                            );
-                        } catch (e) {
-                            setError(
-                                e instanceof Error
-                                    ? e.message
-                                    : "Search failed",
-                            );
-                        }
-                    }}
-                >
-                    Check for existing titles
-                </button>
-                {duplicates && (
-                    <div
-                        role="status"
-                        className="border border-cyan-800 rounded-lg p-3"
-                    >
-                        {duplicates.filter((s) => s.id !== seriesId).length ===
-                        0
-                            ? "No similar titles found."
-                            : duplicates
-                                  .filter((s) => s.id !== seriesId)
-                                  .map((s) => (
-                                      <p key={s.id}>
-                                          <Link
-                                              href={`/series/${s.id}`}
-                                              target="_blank"
-                                              className="underline"
-                                          >
-                                              {s.title}
-                                          </Link>{" "}
-                                          · {s.category} · {s.format} ·{" "}
-                                          {s.release_year ?? "Year unknown"}
-                                      </p>
-                                  ))}
-                    </div>
-                )}
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <label>
-                        Category
-                        <select
-                            disabled={!!seriesId}
-                            className="tdx-field p-3 mt-1"
-                            value={payload.category}
-                            onChange={(e) =>
-                                field(
-                                    "category",
-                                    e.target
-                                        .value as CatalogPayload["category"],
-                                )
-                            }
+                    {duplicates && (
+                        <div
+                            role="status"
+                            className={`tdx-callout mt-2 text-xs ${nearMatches.length ? "tdx-callout-warn" : "tdx-callout-ok"}`}
                         >
-                            <option value="tokusatsu">Tokusatsu</option>
-                            <option value="anime">Anime</option>
-                            <option value="other">Other (movies only)</option>
-                        </select>
-                    </label>
-                    <label>
-                        Format
-                        <select
-                            disabled={!!seriesId}
-                            className="tdx-field p-3 mt-1"
-                            value={payload.format}
-                            onChange={(e) =>
-                                field(
-                                    "format",
-                                    e.target.value as CatalogPayload["format"],
-                                )
-                            }
-                        >
-                            <option value="series">
-                                Series / anime season
-                            </option>
-                            <option value="movie">Movie</option>
-                        </select>
-                    </label>
+                            <Info size={14} className="mt-0.5 flex-none" aria-hidden />
+                            <span>
+                                {nearMatches.length === 0 ? (
+                                    "Checked for existing titles — no close match."
+                                ) : (
+                                    <>
+                                        Checked for existing titles —{" "}
+                                        {nearMatches.length === 1
+                                            ? "one close match"
+                                            : `${nearMatches.length} close matches`}
+                                        :{" "}
+                                        {nearMatches.map((s, i) => (
+                                            <span key={s.id}>
+                                                {i > 0 && ", "}
+                                                <Link
+                                                    href={`/community/new?id=${s.id}`}
+                                                    className="font-medium underline underline-offset-2"
+                                                >
+                                                    {s.title} · {s.category} ·{" "}
+                                                    {s.format}
+                                                    {s.release_year
+                                                        ? ` · ${s.release_year}`
+                                                        : ""}
+                                                </Link>
+                                            </span>
+                                        ))}
+                                        . If that&apos;s the one, suggest a
+                                        correction to it instead; it keeps
+                                        everyone&apos;s tracking history in
+                                        one place.
+                                    </>
+                                )}
+                            </span>
+                        </div>
+                    )}
                 </div>
-                <p className="text-sm text-cyan-200/70">
-                    Use a separate title for each anime season or distinct run.
-                    Related seasons can share a franchise.
-                </p>
-                <label className="block">
-                    Franchise
+
+                <div>
+                    <span className="tdx-label">Category</span>
+                    <Choice
+                        name="category"
+                        disabled={locked}
+                        value={payload.category}
+                        onChange={(v) => {
+                            field("category", v);
+                            if (v === "other") field("format", "movie");
+                        }}
+                        options={[
+                            { value: "tokusatsu", label: "Tokusatsu" },
+                            { value: "anime", label: "Anime" },
+                            {
+                                value: "other",
+                                label: "Other",
+                                disabled: payload.format === "series",
+                            },
+                        ]}
+                    />
+                </div>
+                <div>
+                    <span className="tdx-label">Format</span>
+                    <Choice
+                        name="format"
+                        disabled={locked}
+                        value={payload.format}
+                        onChange={(v) => field("format", v)}
+                        options={[
+                            {
+                                value: "series",
+                                label: "Series",
+                                disabled: payload.category === "other",
+                            },
+                            { value: "movie", label: "Movie" },
+                        ]}
+                    />
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                        &ldquo;Other&rdquo; is only available for movies. Use a
+                        separate title for each anime season.
+                    </p>
+                </div>
+
+                <div>
+                    <label htmlFor="sub-franchise" className="tdx-label">
+                        Franchise{" "}
+                        <span className="tdx-label-hint">
+                            optional — groups seasons
+                        </span>
+                    </label>
                     <input
-                        className="tdx-field p-3 mt-1"
+                        id="sub-franchise"
+                        className="tdx-field"
                         maxLength={200}
                         value={payload.franchise ?? ""}
                         onChange={(e) =>
                             field("franchise", e.target.value || null)
                         }
                     />
-                </label>
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <label>
+                    <label htmlFor="sub-year" className="tdx-label mt-3">
                         Release year
-                        <input
-                            type="number"
-                            min={1800}
-                            max={2200}
-                            className="tdx-field p-3 mt-1"
-                            value={payload.release_year ?? ""}
-                            onChange={(e) =>
-                                field(
-                                    "release_year",
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                )
-                            }
-                        />
                     </label>
+                    <input
+                        id="sub-year"
+                        type="number"
+                        min={1800}
+                        max={2200}
+                        className="tdx-field"
+                        value={payload.release_year ?? ""}
+                        onChange={(e) =>
+                            field(
+                                "release_year",
+                                e.target.value ? Number(e.target.value) : null,
+                            )
+                        }
+                    />
+                </div>
+                <div>
                     {payload.format === "movie" ? (
-                        <label>
-                            Runtime (minutes)
+                        <>
+                            <label htmlFor="sub-runtime" className="tdx-label">
+                                Runtime{" "}
+                                <span className="tdx-label-hint">minutes</span>
+                            </label>
                             <input
+                                id="sub-runtime"
                                 type="number"
                                 min={1}
                                 max={10000}
-                                className="tdx-field p-3 mt-1"
+                                className="tdx-field"
                                 value={payload.runtime_minutes ?? ""}
                                 onChange={(e) =>
                                     field(
@@ -256,15 +332,21 @@ export default function SubmissionForm({
                                     )
                                 }
                             />
-                        </label>
+                        </>
                     ) : (
-                        <label>
-                            Total episodes (leave blank if unknown)
+                        <>
+                            <label htmlFor="sub-episodes" className="tdx-label">
+                                Episodes{" "}
+                                <span className="tdx-label-hint">
+                                    leave blank if unknown
+                                </span>
+                            </label>
                             <input
+                                id="sub-episodes"
                                 type="number"
                                 min={1}
                                 max={100000}
-                                className="tdx-field p-3 mt-1"
+                                className="tdx-field"
                                 value={payload.total_episodes ?? ""}
                                 onChange={(e) =>
                                     field(
@@ -275,173 +357,224 @@ export default function SubmissionForm({
                                     )
                                 }
                             />
-                        </label>
+                        </>
                     )}
                 </div>
-                <label className="block">
-                    Synopsis
+
+                <div className="sm:col-span-2">
+                    <label htmlFor="sub-sources" className="tdx-label">
+                        HTTPS source links{" "}
+                        <span className="tdx-label-hint">
+                            one per line, required
+                            {correction ? " — a source helps a lot" : ""}
+                        </span>
+                    </label>
                     <textarea
-                        className="tdx-field p-3 mt-1"
-                        rows={4}
+                        id="sub-sources"
+                        required
+                        className="tdx-field min-h-[56px] leading-[1.6]"
+                        rows={2}
+                        value={sources}
+                        onChange={(e) => setSources(e.target.value)}
+                        placeholder="https://"
+                    />
+                </div>
+                <div className="sm:col-span-2">
+                    <label htmlFor="sub-synopsis" className="tdx-label">
+                        Synopsis <span className="tdx-label-hint">optional</span>
+                    </label>
+                    <textarea
+                        id="sub-synopsis"
+                        className="tdx-field min-h-[70px] text-[13px] leading-[1.5]"
+                        rows={3}
                         maxLength={5000}
                         value={payload.synopsis ?? ""}
+                        placeholder="A short, spoiler-free description helps other people decide where to start."
                         onChange={(e) =>
                             field("synopsis", e.target.value || null)
                         }
                     />
-                </label>
-                <label className="block">
-                    HTTPS source links (one per line)
-                    <textarea
-                        required
-                        className="tdx-field p-3 mt-1"
-                        rows={3}
-                        value={sources}
-                        onChange={(e) => setSources(e.target.value)}
-                    />
-                </label>
+                </div>
+
                 {payload.format === "series" && (
-                    <section className="space-y-3">
-                        <h2 className="text-xl font-semibold">
-                            Episode additions / corrections
-                        </h2>
-                        <p>
-                            Only include episodes you want to add or change.
-                            Existing episodes are otherwise preserved.
-                        </p>
-                        {payload.episodes.map((ep, i) => (
-                            <fieldset
-                                className="border border-cyan-800 rounded-lg p-3 space-y-2"
-                                key={i}
-                            >
-                                <legend>Episode {i + 1}</legend>
-                                <label className="block">
-                                    Number
-                                    <input
-                                        type="number"
-                                        required
-                                        min={1}
-                                        className="tdx-field p-2"
-                                        value={ep.episode_number}
-                                        onChange={(e) =>
-                                            episode(
-                                                i,
-                                                "episode_number",
-                                                Number(e.target.value),
-                                            )
-                                        }
-                                    />
-                                </label>
-                                <label className="block">
-                                    Episode title
-                                    <input
-                                        required
-                                        maxLength={300}
-                                        className="tdx-field p-2"
-                                        value={ep.title}
-                                        onChange={(e) =>
-                                            episode(i, "title", e.target.value)
-                                        }
-                                    />
-                                </label>
-                                <label className="block">
-                                    Episode summary
-                                    <textarea
-                                        maxLength={5000}
-                                        className="tdx-field p-2"
-                                        value={ep.synopsis ?? ""}
-                                        onChange={(e) =>
-                                            episode(
-                                                i,
-                                                "synopsis",
-                                                e.target.value || null,
-                                            )
-                                        }
-                                    />
-                                </label>
-                                <label className="block">
-                                    Air date
-                                    <input
-                                        type="date"
-                                        className="tdx-field p-2"
-                                        value={ep.air_date ?? ""}
-                                        onChange={(e) =>
-                                            episode(
-                                                i,
-                                                "air_date",
-                                                e.target.value || null,
-                                            )
-                                        }
-                                    />
-                                </label>
-                                <label className="block">
-                                    Episode type
-                                    <select
-                                        className="tdx-field p-2"
-                                        value={ep.episode_type ?? ""}
-                                        onChange={(e) =>
-                                            episode(
-                                                i,
-                                                "episode_type",
-                                                e.target.value || null,
+                    <section className="sm:col-span-2 mt-1">
+                        <div className="flex items-baseline gap-2.5">
+                            <h2 className="text-sm font-medium">
+                                Episode additions and corrections
+                            </h2>
+                            <span className="text-[11px] text-[var(--text-muted)]">
+                                only the episodes you want to add or change —
+                                everything else stays as it is
+                            </span>
+                        </div>
+                        <div className="flex flex-col gap-2.5 mt-2.5">
+                            {payload.episodes.map((ep, i) => (
+                                <fieldset
+                                    className="tdx-panel p-3 grid grid-cols-[72px_1fr] sm:grid-cols-[72px_1fr_150px_130px] gap-2.5"
+                                    key={i}
+                                >
+                                    <label className="tdx-label mb-0">
+                                        Number
+                                        <input
+                                            type="number"
+                                            required
+                                            min={1}
+                                            className="tdx-field mt-1 min-h-[36px] py-1.5"
+                                            value={ep.episode_number}
+                                            onChange={(e) =>
+                                                episode(
+                                                    i,
+                                                    "episode_number",
+                                                    Number(e.target.value),
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="tdx-label mb-0">
+                                        Title
+                                        <input
+                                            required
+                                            maxLength={300}
+                                            className="tdx-field mt-1 min-h-[36px] py-1.5"
+                                            value={ep.title}
+                                            onChange={(e) =>
+                                                episode(i, "title", e.target.value)
+                                            }
+                                        />
+                                    </label>
+                                    <label className="tdx-label mb-0">
+                                        Air date
+                                        <input
+                                            type="date"
+                                            className="tdx-field mt-1 min-h-[36px] py-1.5"
+                                            value={ep.air_date ?? ""}
+                                            onChange={(e) =>
+                                                episode(
+                                                    i,
+                                                    "air_date",
+                                                    e.target.value || null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="tdx-label mb-0">
+                                        Type
+                                        <select
+                                            className="tdx-field mt-1 min-h-[36px] py-1.5"
+                                            value={ep.episode_type ?? ""}
+                                            onChange={(e) =>
+                                                episode(
+                                                    i,
+                                                    "episode_type",
+                                                    e.target.value || null,
+                                                )
+                                            }
+                                        >
+                                            <option value="">Standard</option>
+                                            {EPISODE_TYPES.map((t) => (
+                                                <option key={t} value={t}>
+                                                    {EPISODE_TYPE_LABELS[t]}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="tdx-label mb-0 col-span-2 sm:col-span-3">
+                                        Summary{" "}
+                                        <span className="tdx-label-hint">optional</span>
+                                        <textarea
+                                            maxLength={5000}
+                                            rows={2}
+                                            className="tdx-field mt-1 min-h-[44px] py-1.5 text-[12.5px]"
+                                            value={ep.synopsis ?? ""}
+                                            onChange={(e) =>
+                                                episode(
+                                                    i,
+                                                    "synopsis",
+                                                    e.target.value || null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        className="tdx-focus-ring self-end mb-2 text-[11.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded"
+                                        onClick={() =>
+                                            field(
+                                                "episodes",
+                                                payload.episodes.filter(
+                                                    (_, j) => i !== j,
+                                                ),
                                             )
                                         }
                                     >
-                                        <option value="">Regular</option>
-                                        {[
-                                            "filler",
-                                            "clip_show",
-                                            "recap",
-                                            "special",
-                                            "crossover",
-                                        ].map((t) => (
-                                            <option key={t}>{t}</option>
-                                        ))}
-                                    </select>
-                                </label>
-                                <button
-                                    type="button"
-                                    className="underline"
-                                    onClick={() =>
-                                        field(
-                                            "episodes",
-                                            payload.episodes.filter(
-                                                (_, j) => i !== j,
-                                            ),
-                                        )
-                                    }
-                                >
-                                    Remove from submission
-                                </button>
-                            </fieldset>
-                        ))}
-                        <button
-                            type="button"
-                            className="tdx-focus-ring underline"
-                            onClick={() =>
-                                field("episodes", [
-                                    ...payload.episodes,
-                                    {
-                                        episode_number:
-                                            payload.episodes.length + 1,
-                                        title: "",
-                                    },
-                                ])
-                            }
-                        >
-                            Add episode
-                        </button>
+                                        Remove
+                                    </button>
+                                </fieldset>
+                            ))}
+                            <button
+                                type="button"
+                                className={buttonClasses({
+                                    variant: "secondary",
+                                    size: "sm",
+                                    className: "self-start",
+                                })}
+                                onClick={() =>
+                                    field("episodes", [
+                                        ...payload.episodes,
+                                        {
+                                            episode_number:
+                                                payload.episodes.length + 1,
+                                            title: "",
+                                        },
+                                    ])
+                                }
+                            >
+                                Add an episode
+                            </button>
+                        </div>
                     </section>
                 )}
-                <button className="tdx-focus-ring bg-cyan-400 text-slate-950 rounded-lg px-5 py-3">
+            </fieldset>
+
+            {error && (
+                <div role="alert" className="tdx-callout tdx-callout-warn">
+                    {error}
+                </div>
+            )}
+
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <button className={buttonClasses()} disabled={busy}>
                     {busy
                         ? "Submitting…"
                         : reviewId
                           ? "Approve and publish"
-                          : "Submit title"}
+                          : correction
+                            ? "Submit correction"
+                            : "Submit title"}
                 </button>
-            </fieldset>
-            <p role="alert">{error}</p>
+                {!correction && !reviewId && (
+                    <button
+                        type="button"
+                        className={buttonClasses({ variant: "secondary" })}
+                        disabled={busy}
+                        onClick={checkDuplicates}
+                    >
+                        Check for existing titles
+                    </button>
+                )}
+                {!reviewId && (
+                    <span className="ml-auto text-[11.5px] text-[var(--text-muted)]">
+                        {attemptsToday} of your {DAILY_LIMIT} submissions today
+                    </span>
+                )}
+            </div>
+            {!reviewId && (
+                <p className="text-[11.5px] text-[var(--text-muted)] leading-[1.5]">
+                    {correction
+                        ? "You'll get a note on My submissions when an admin looks at it."
+                        : "Poster art is assigned by an admin from approved storage after publication — no uploads needed from you. Trusted contributors publish straight through this same form."}
+                </p>
+            )}
         </form>
     );
 }

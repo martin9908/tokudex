@@ -6,6 +6,7 @@ import { trackServer } from "@/lib/analytics";
 import { attributeReferral } from "@/lib/referrals";
 import { isValidEmail, validatePasswordStrength } from "@/lib/validation";
 import LoginForm from "./LoginForm";
+import { EnvelopeSimple, WarningCircle } from "@phosphor-icons/react/ssr";
 
 async function getOrigin() {
     const h = await headers();
@@ -15,11 +16,11 @@ async function getOrigin() {
 }
 
 type LoginPageProps = {
-    searchParams: Promise<{ error?: string; message?: string }>;
+    searchParams: Promise<{ error?: string; message?: string; mode?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-    const { error, message } = await searchParams;
+    const { error, message, mode } = await searchParams;
 
     async function signIn(formData: FormData) {
         "use server";
@@ -98,7 +99,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         }
 
         await trackServer("signup");
-        redirect("/");
+        redirect("/welcome");
     }
 
     async function forgotPassword(formData: FormData) {
@@ -123,51 +124,51 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     }
 
     return (
-        <div className="flex flex-1 items-center justify-center px-4 py-16">
-            <div className="w-full max-w-sm tdx-panel p-6">
-                <h1 className="text-2xl font-semibold tracking-tight mb-1">TokuDex</h1>
-                <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70 mb-2">
-                    Tokusatsu Episode Tracker
+        <div className="flex flex-1 items-center justify-center px-4 py-10 sm:py-16 pb-24">
+            <div className="w-full max-w-[372px] tdx-panel p-6">
+                <p className="font-semibold text-[22px] leading-none tracking-[-0.035em]">
+                    Toku<span className="text-[var(--accent-primary)]">Dex</span>
                 </p>
-                <p className="text-sm text-cyan-200/70 mb-8">
-                    Remember where you stopped and what happened last — TokuDex tracks your progress, it doesn&apos;t stream episodes.
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--accent-primary)] mt-2">
+                    Tokusatsu episode tracker
+                </p>
+                <p className="text-[12.5px] leading-[1.55] text-[var(--text-secondary)] mt-2.5 mb-5">
+                    Remember where you stopped and what happened last — TokuDex
+                    tracks your progress, it doesn&apos;t stream episodes.
                 </p>
                 {error && (
-                    <p
-                        role="alert"
-                        className="mb-4 rounded-xl border border-red-900/45 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-                    >
-                        {error}
+                    <p role="alert" className="tdx-callout tdx-callout-warn mb-3.5 text-xs">
+                        <WarningCircle size={14} className="mt-0.5 flex-none" aria-hidden />
+                        <span>{error}</span>
                     </p>
                 )}
                 {message && (
-                    <p
-                        role="status"
-                        className="mb-4 rounded-xl border border-emerald-900/45 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300"
-                    >
-                        {message}
+                    <p role="status" className="tdx-callout tdx-callout-ok mb-3.5 text-xs">
+                        <EnvelopeSimple size={14} className="mt-0.5 flex-none" aria-hidden />
+                        <span>{message}</span>
                     </p>
                 )}
                 <LoginForm
                     signIn={signIn}
                     signUp={signUp}
                     forgotPassword={forgotPassword}
+                    initialMode={mode === "signup" ? "signup" : "signin"}
                 />
-                <div className="mt-5 border-t border-cyan-900/50 pt-4 text-center">
+                <div className="mt-4 border-t border-[var(--line)] pt-3.5 text-center">
                     <Link
                         href="/"
-                        className="tdx-focus-ring text-sm text-cyan-200/80 hover:text-cyan-100"
+                        className="tdx-focus-ring rounded text-[12.5px] text-[var(--accent-primary)]"
                     >
                         Browse as guest →
                     </Link>
                 </div>
-                <p className="mt-6 text-center text-xs text-cyan-200/55">
+                <p className="mt-3.5 text-center text-[11px] leading-[1.5] text-[var(--text-muted)]">
                     By continuing you agree to our{" "}
-                    <Link href="/terms" className="text-cyan-300/80 hover:text-cyan-200">
+                    <Link href="/terms" className="hover:text-[var(--text-primary)]">
                         Terms
                     </Link>{" "}
                     and{" "}
-                    <Link href="/privacy" className="text-cyan-300/80 hover:text-cyan-200">
+                    <Link href="/privacy" className="hover:text-[var(--text-primary)]">
                         Privacy Policy
                     </Link>
                     .

@@ -20,7 +20,11 @@ export default function SignOutButton({ className = "" }: SignOutButtonProps) {
     return (
         <button
             onClick={handleSignOut}
-            className={`text-sm text-cyan-100/75 hover:text-cyan-300 transition-colors ${className}`}
+            type="button"
+            className={
+                className ||
+                "text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            }
         >
             Sign out
         </button>

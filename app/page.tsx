@@ -6,6 +6,7 @@ import {
     Medal,
     Sparkle,
     LockSimple,
+    SquaresFour,
 } from "@phosphor-icons/react/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProgressBySeries } from "@/lib/supabase/queries";
@@ -20,6 +21,8 @@ import GuestHome from "./components/organisms/GuestHome";
 import SupportBanner from "./components/molecules/SupportBanner";
 import ChangeStatusSelect from "./components/molecules/ChangeStatusSelect";
 import ResumeButton from "./components/molecules/ResumeButton";
+import MarkWatchedButton from "./components/molecules/MarkWatchedButton";
+import { getGuestSeries } from "@/lib/guest";
 
 const CATEGORY_LABEL: Record<string, string> = {
     tokusatsu: "Tokusatsu",
@@ -63,7 +66,12 @@ export default async function Home() {
         seriesItems[0];
     const alsoWatching = seriesItems.filter((i) => i !== upNext);
 
-    const [{ data: lastEpisode }, referralCount] = await Promise.all([
+    const [
+        { data: lastEpisode },
+        referralCount,
+        { data: submissionRows },
+        suggestions,
+    ] = await Promise.all([
         upNext
             ? client
                   .from("episodes")
@@ -73,7 +81,17 @@ export default async function Home() {
                   .maybeSingle()
             : Promise.resolve({ data: null }),
         getReferralCount(user.id),
+        client
+            .from("catalog_submissions")
+            .select("status")
+            .eq("author_id", user.id),
+        items.length === 0 ? getGuestSeries() : Promise.resolve([]),
     ]);
+    const submissionCounts = { pending: 0, published: 0, rejected: 0 };
+    for (const row of submissionRows ?? []) {
+        if (row.status in submissionCounts)
+            submissionCounts[row.status as keyof typeof submissionCounts] += 1;
+    }
 
     const { current: rankCurrent, next: rankNext } = getRank(
         tokuEpisodesLogged,
@@ -105,10 +123,59 @@ export default async function Home() {
     return (
         <div className="max-w-6xl mx-auto px-6 py-6 pb-24">
             {items.length === 0 && (
-                <p className="tdx-panel p-5 text-[var(--text-secondary)] mb-6">
-                    Find a title in the library, add it to your tracker, and
-                    log what you watch.
-                </p>
+                <section className="mb-6">
+                    <div className="p-7 rounded-lg border border-dashed border-[var(--line)] text-center">
+                        <SquaresFour
+                            size={32}
+                            className="mx-auto text-[var(--text-muted)]"
+                        />
+                        <h2 className="text-base font-medium mt-3">
+                            Nothing tracked yet
+                        </h2>
+                        <p className="text-[12.5px] text-[var(--text-secondary)] mt-1.5 leading-[1.5] max-w-[330px] mx-auto">
+                            Pick a series you&apos;re watching and log the
+                            episode you&apos;re on. Everything else — rank,
+                            badges, rankings — follows from that.
+                        </p>
+                        <div className="flex gap-2.5 justify-center mt-4 flex-wrap">
+                            <Link href="/welcome" className={buttonClasses()}>
+                                Get started
+                            </Link>
+                            <Link
+                                href="/series"
+                                className={buttonClasses({ variant: "secondary" })}
+                            >
+                                Browse the catalog
+                            </Link>
+                            <Link
+                                href="/community/new"
+                                className={buttonClasses({ variant: "secondary" })}
+                            >
+                                Add a title
+                            </Link>
+                        </div>
+                    </div>
+                    {suggestions.length > 0 && (
+                        <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {suggestions.slice(0, 2).map((s, i) => (
+                                <Link
+                                    key={s.id}
+                                    href={`/series/${s.id}`}
+                                    className="tdx-focus-ring tdx-panel p-3 hover:border-[var(--accent-primary)] transition-colors"
+                                >
+                                    <p className="text-[11px] text-[var(--text-muted)]">
+                                        {i === 0
+                                            ? "Popular right now"
+                                            : "Good place to start"}
+                                    </p>
+                                    <p className="text-[13px] mt-1.5">
+                                        {s.title}
+                                    </p>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </section>
             )}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_292px] gap-6">
                 <div className="flex flex-col gap-6 min-w-0">
@@ -388,10 +455,9 @@ export default async function Home() {
                                 {movieItems.map(({ series: s, progress: p }) => {
                                     const watched = p.current_episode === 1;
                                     return (
-                                        <Link
+                                        <div
                                             key={s.id}
-                                            href={`/series/${s.id}`}
-                                            className={`tdx-focus-ring tdx-panel p-3 flex items-center gap-3 border-l-[3px] ${
+                                            className={`tdx-panel p-3 flex items-center gap-3 border-l-[3px] ${
                                                 watched
                                                     ? "border-l-[var(--accent-primary)]"
                                                     : "border-l-[var(--line)]"
@@ -406,11 +472,21 @@ export default async function Home() {
                                                 }
                                             />
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium">
+                                                <Link
+                                                    href={`/series/${s.id}`}
+                                                    className="tdx-focus-ring text-[13.5px] font-medium hover:text-[var(--accent-primary)] transition-colors"
+                                                >
                                                     {s.title}
-                                                </p>
+                                                </Link>
                                                 <p className="text-[11.5px] text-[var(--text-secondary)] mt-0.5">
-                                                    {s.release_year ?? ""}
+                                                    {[
+                                                        s.release_year,
+                                                        watched
+                                                            ? `${CATEGORY_LABEL[s.category] ?? ""} movie`.trim()
+                                                            : "Plan to watch",
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" · ")}
                                                 </p>
                                             </div>
                                             {watched ? (
@@ -422,11 +498,11 @@ export default async function Home() {
                                                     Watched
                                                 </span>
                                             ) : (
-                                                <span className="text-[11.5px] text-[var(--text-muted)]">
-                                                    Plan to watch
-                                                </span>
+                                                <MarkWatchedButton
+                                                    seriesId={s.id}
+                                                />
                                             )}
-                                        </Link>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -436,9 +512,7 @@ export default async function Home() {
 
                 <aside className="flex flex-col gap-4">
                     <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
-                        <div className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
-                            Rank
-                        </div>
+                        <div className="tdx-eyebrow">Rank · tokusatsu only</div>
                         <div className="text-[22px] font-medium mt-1 tracking-[-0.01em]">
                             {rankCurrent.title}
                         </div>
@@ -458,12 +532,13 @@ export default async function Home() {
                                     : "Max rank"}
                             </span>
                         </div>
+                        <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+                            Anime and movies count in totals, not in ranks.
+                        </p>
                     </div>
 
                     <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
-                        <div className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
-                            Tracker
-                        </div>
+                        <div className="tdx-eyebrow">Tracker</div>
                         <div className="grid grid-cols-2 gap-x-2.5 gap-y-3.5 mt-3.5">
                             <div>
                                 <div className="text-2xl font-medium leading-none text-[var(--accent-text)]">
@@ -506,9 +581,7 @@ export default async function Home() {
 
                     <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
                         <div className="flex items-baseline gap-2">
-                            <span className="text-[9.5px] uppercase tracking-[0.13em] text-[var(--text-secondary)]">
-                                Awards
-                            </span>
+                            <span className="tdx-eyebrow">Awards</span>
                             <span className="text-[11px] text-[var(--text-muted)]">
                                 {earnedCount} of {milestones.length}
                             </span>
@@ -555,6 +628,43 @@ export default async function Home() {
                                 "All milestones unlocked."
                             )}
                         </p>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--line)]">
+                        <div className="tdx-eyebrow">Your submissions</div>
+                        {submissionCounts.pending +
+                            submissionCounts.published +
+                            submissionCounts.rejected >
+                        0 ? (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                {submissionCounts.pending > 0 && (
+                                    <span className="tdx-chip tdx-chip-warn text-[11.5px]">
+                                        {submissionCounts.pending} pending
+                                    </span>
+                                )}
+                                {submissionCounts.published > 0 && (
+                                    <span className="tdx-chip tdx-chip-ok text-[11.5px]">
+                                        {submissionCounts.published} published
+                                    </span>
+                                )}
+                                {submissionCounts.rejected > 0 && (
+                                    <span className="tdx-chip text-[11.5px]">
+                                        {submissionCounts.rejected} rejected
+                                    </span>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="mt-2.5 text-[11.5px] text-[var(--text-secondary)] leading-[1.45]">
+                                Missing a title? Add it and an admin will
+                                check it over.
+                            </p>
+                        )}
+                        <Link
+                            href="/community"
+                            className="block mt-3 text-[11.5px] text-[var(--accent-primary)]"
+                        >
+                            Open my submissions →
+                        </Link>
                     </div>
                 </aside>
             </div>

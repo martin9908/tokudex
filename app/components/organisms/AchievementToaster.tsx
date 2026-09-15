@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SealCheck } from "@phosphor-icons/react";
 import ShareButton from "../molecules/ShareButton";
+import { buttonClasses } from "../atoms";
 
 const STORAGE_KEY = "tokudex.earnedAchievements";
 
@@ -77,29 +79,28 @@ function AchievementToast({ toast, onDone }: { toast: Toast; onDone: () => void 
     return (
         <div
             role="status"
-            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-amber-400/45 bg-[#12202f] px-4 py-3 text-left shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
+            className="pointer-events-auto w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3.5 text-left shadow-[0_10px_40px_var(--shade)]"
         >
-            <span className="text-xl" aria-hidden>
-                🏆
-            </span>
-            <div className="min-w-0 flex-1">
-                <span className="block text-[11px] uppercase tracking-wider text-amber-300/80">
-                    Achievement unlocked
-                </span>
-                <span className="mb-2 block text-sm font-semibold text-cyan-50">{toast.text}</span>
+            <p className="tdx-eyebrow">Badge unlocked</p>
+            <div className="mt-2.5 p-4 rounded-lg bg-[var(--accent-tint)] border border-[var(--accent-primary)] text-center">
+                <SealCheck size={30} weight="fill" className="mx-auto text-[var(--accent-on)]" aria-hidden />
+                <p className="text-[15px] font-medium text-[var(--accent-on)] mt-2">{toast.text}</p>
+            </div>
+            <div className="flex gap-2 mt-3">
                 <ShareButton
                     shareKey={toast.achievementKey}
+                    size="md"
                     text={`I unlocked "${toast.text}" on TokuDex!`}
+                    className="flex-1 [&>button]:w-full"
                 />
+                <button
+                    type="button"
+                    onClick={onDone}
+                    className={buttonClasses({ variant: "secondary", className: "flex-1" })}
+                >
+                    Dismiss
+                </button>
             </div>
-            <button
-                type="button"
-                onClick={onDone}
-                aria-label="Dismiss"
-                className="tdx-focus-ring shrink-0 rounded text-lg leading-none text-cyan-300/70 hover:text-cyan-100"
-            >
-                ×
-            </button>
         </div>
     );
 }
