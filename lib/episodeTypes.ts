@@ -20,14 +20,16 @@ export const EPISODE_TYPE_LABELS: Record<EpisodeType, string> = {
     crossover: "Crossover",
 };
 
-// Per-type accent classes (border + tint + text), matching the pill styling
-// used for tracking status in lib/status.ts.
+// Flat, neutral hairline pill — every episode-type tag reads the same way,
+// so the tag communicates "this isn't a normal episode" without competing
+// with the accent color used for watch-progress state.
+const NEUTRAL_BADGE = "border-[var(--line)] text-[var(--text-muted)]";
 export const EPISODE_TYPE_BADGE_CLASSES: Record<EpisodeType, string> = {
-    filler: "border-amber-500/40 bg-amber-500/15 text-amber-200",
-    clip_show: "border-violet-500/40 bg-violet-500/15 text-violet-200",
-    recap: "border-slate-500/40 bg-slate-500/15 text-slate-200",
-    special: "border-fuchsia-500/40 bg-fuchsia-500/15 text-fuchsia-200",
-    crossover: "border-sky-500/40 bg-sky-500/15 text-sky-200",
+    filler: NEUTRAL_BADGE,
+    clip_show: NEUTRAL_BADGE,
+    recap: NEUTRAL_BADGE,
+    special: NEUTRAL_BADGE,
+    crossover: NEUTRAL_BADGE,
 };
 
 /**

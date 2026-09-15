@@ -8,6 +8,10 @@ series in seconds. It tracks; it doesn't stream.
 
 **Live:** https://tokudex.vercel.app
 
+## Community catalog release
+
+The catalog now supports tokusatsu, anime, and movies, with community submissions, admin review, time-limited publishing trust, and 1–10 community rankings. See [release and database instructions](docs/community-release.md) before deploying and [mobile direction](docs/mobile-direction.md) for the Capacitor/React Native assessment.
+
 ## Features
 
 **Tracking & recaps**

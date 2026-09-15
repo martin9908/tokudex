@@ -4,16 +4,16 @@ export type ButtonSize = "sm" | "md" | "lg";
 const variantClasses: Record<ButtonVariant, string> = {
     primary: "bg-[var(--accent-primary)] text-[#00121b] hover:opacity-90",
     secondary:
-        "border border-[var(--surface-elevated)] text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]",
+        "border border-[var(--line)] text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]",
     ghost: "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]",
     danger: "bg-[var(--error)] text-[#200507] hover:opacity-90",
     warning: "bg-[var(--warning)] text-[#1a1000] hover:opacity-90",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-    sm: "px-3 py-1.5 text-xs min-h-[32px] rounded-lg",
-    md: "px-4 py-2.5 text-sm min-h-[44px] rounded-xl",
-    lg: "px-5 py-3 text-sm min-h-[56px] rounded-xl",
+    sm: "px-3 py-1.5 text-xs min-h-[32px] rounded-md",
+    md: "px-4 py-2.5 text-sm min-h-[44px] rounded-lg",
+    lg: "px-5 py-3 text-sm min-h-[56px] rounded-lg",
 };
 
 interface ButtonClassOptions {

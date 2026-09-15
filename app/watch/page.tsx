@@ -50,10 +50,19 @@ function WatchPageContent() {
                 if (!res.ok) throw new Error("Failed to fetch series");
 
                 const data = await res.json();
+                if (data.series.format === "movie") {
+                    router.replace(`/series/${seriesId}`);
+                    return;
+                }
                 setSeries(data.series);
+                const existingNote = data.notes?.find(
+                    (n: { episode_number: number; note: string }) =>
+                        n.episode_number === episodeNumber,
+                );
+                setNote(existingNote?.note ?? "");
 
                 const foundEpisode = data.episodes.find(
-                    (e: Episode) => e.episode_number === episodeNumber
+                    (e: Episode) => e.episode_number === episodeNumber,
                 );
                 setEpisode(foundEpisode || null);
                 setError(null);
@@ -65,7 +74,7 @@ function WatchPageContent() {
         }
 
         fetchData();
-    }, [seriesId, episodeNumber]);
+    }, [seriesId, episodeNumber, router]);
 
     async function handleSave() {
         if (!seriesId || saving) return;
@@ -74,7 +83,7 @@ function WatchPageContent() {
             setSaving(true);
             setError(null);
 
-            // Single atomic-ish server round-trip: progress + optional note.
+            // Single atomic database transaction: progress + optional note.
             await saveEpisodeCheckIn(seriesId, episodeNumber, status, note);
 
             router.push(`/series/${seriesId}`);
@@ -97,7 +106,10 @@ function WatchPageContent() {
         return (
             <div className="max-w-3xl mx-auto px-4 py-8 w-full">
                 <p className="text-red-400/90 mb-4">Series not found</p>
-                <Link href="/series" className="text-cyan-300 hover:text-cyan-200">
+                <Link
+                    href="/series"
+                    className="text-cyan-300 hover:text-cyan-200"
+                >
                     Back to Series
                 </Link>
             </div>
@@ -113,7 +125,9 @@ function WatchPageContent() {
                 <h1 className="text-3xl font-bold mb-1">{series.title}</h1>
                 <p className="text-cyan-100/75">Episode {episodeNumber}</p>
                 {episode && (
-                    <p className="text-sm text-cyan-200/70 mt-2">{episode.title}</p>
+                    <p className="text-sm text-cyan-200/70 mt-2">
+                        {episode.title}
+                    </p>
                 )}
             </section>
 
@@ -125,7 +139,10 @@ function WatchPageContent() {
 
             <section className="tdx-panel p-5 space-y-4">
                 <div>
-                    <label htmlFor="recap-note" className="text-sm font-medium text-cyan-100/90 block mb-2">
+                    <label
+                        htmlFor="recap-note"
+                        className="text-sm font-medium text-cyan-100/90 block mb-2"
+                    >
                         Quick recap note
                     </label>
                     <textarea
@@ -142,7 +159,12 @@ function WatchPageContent() {
                     </p>
                 </div>
                 <div>
-                    <label htmlFor="status" className="text-sm font-medium text-cyan-100/90 block mb-2">Status</label>
+                    <label
+                        htmlFor="status"
+                        className="text-sm font-medium text-cyan-100/90 block mb-2"
+                    >
+                        Status
+                    </label>
                     <div className="relative">
                         <select
                             id="status"
@@ -150,10 +172,10 @@ function WatchPageContent() {
                             onChange={(e) =>
                                 setStatus(
                                     e.target.value as
-                                    | "watching"
-                                    | "completed"
-                                    | "on_hold"
-                                    | "plan_to_watch"
+                                        | "watching"
+                                        | "completed"
+                                        | "on_hold"
+                                        | "plan_to_watch",
                                 )
                             }
                             className="tdx-field appearance-none px-3 py-2.5 pr-10"
@@ -171,7 +193,13 @@ function WatchPageContent() {
                             fill="none"
                             aria-hidden
                         >
-                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path
+                                d="M6 9l6 6 6-6"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
                         </svg>
                     </div>
                 </div>

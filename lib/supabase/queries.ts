@@ -1,3 +1,4 @@
+import { saveTracking, saveEpisodeNote } from "../tracking";
 import { createClient as createServerClient } from "./server";
 
 /**
@@ -9,6 +10,7 @@ export async function getAllSeries() {
     const { data, error } = await client
         .from("series")
         .select("*")
+        .eq("hidden", false)
         .order("title", { ascending: true });
 
     if (error) throw error;
@@ -17,7 +19,12 @@ export async function getAllSeries() {
 
 export async function getSeriesById(id: string) {
     const client = await createServerClient();
-    const { data, error } = await client.from("series").select("*").eq("id", id).single();
+    const { data, error } = await client
+        .from("series")
+        .select("*")
+        .eq("hidden", false)
+        .eq("id", id)
+        .single();
 
     if (error) throw error;
     return data;
@@ -28,6 +35,7 @@ export async function getSeriesWithEpisodes(id: string) {
     const { data: series, error: seriesError } = await client
         .from("series")
         .select("*")
+        .eq("hidden", false)
         .eq("id", id)
         .single();
 
@@ -77,34 +85,25 @@ export async function upsertUserProgress(
     userId: string,
     seriesId: string,
     currentEpisode: number,
-    status: "watching" | "completed" | "on_hold" | "plan_to_watch"
+    status: "watching" | "completed" | "on_hold" | "plan_to_watch",
 ) {
     const client = await createServerClient();
-    const { data, error } = await client
-        .from("user_series_progress")
-        .upsert(
-            {
-                user_id: userId,
-                series_id: seriesId,
-                current_episode: currentEpisode,
-                status: status,
-                last_watched_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,series_id" }
-        )
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user || user.id !== userId) throw new Error("Unauthorized");
+    return saveTracking({ seriesId, episode: currentEpisode, status });
 }
 
 /**
  * Episode notes queries
  */
 
-export async function getEpisodeNote(userId: string, seriesId: string, episodeNumber: number) {
+export async function getEpisodeNote(
+    userId: string,
+    seriesId: string,
+    episodeNumber: number,
+) {
     const client = await createServerClient();
     const { data, error } = await client
         .from("episode_notes")
@@ -135,24 +134,10 @@ export async function upsertEpisodeNote(
     userId: string,
     seriesId: string,
     episodeNumber: number,
-    note: string
+    note: string,
 ) {
     const client = await createServerClient();
-    const { data, error } = await client
-        .from("episode_notes")
-        .upsert(
-            {
-                user_id: userId,
-                series_id: seriesId,
-                episode_number: episodeNumber,
-                note: note,
-                created_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,series_id,episode_number" }
-        )
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const { data: { user } } = await client.auth.getUser();
+    if (!user || user.id !== userId) throw new Error("Unauthorized");
+    return saveEpisodeNote(seriesId, episodeNumber, note);
 }

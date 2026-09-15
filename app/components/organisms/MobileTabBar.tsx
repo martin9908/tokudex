@@ -2,61 +2,38 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { House, SquaresFour, Trophy } from "@phosphor-icons/react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
-function HomeIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-                d="M3 10.5 12 3l9 7.5M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-function SeriesIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-                d="M4 5a1 1 0 0 1 1-1h5v16H5a1 1 0 0 1-1-1V5Zm10-1h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5V4Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-function TrophyIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-                d="M7 4h10v3a5 5 0 0 1-10 0V4Zm0 1H4v2a3 3 0 0 0 3 3m10-5h3v2a3 3 0 0 1-3 3M9 13.5h6M12 12v3m-3 5h6M10 17.5h4V20h-4z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-const TABS = [
-    { href: "/", label: "Home", Icon: HomeIcon, match: (p: string) => p === "/" },
+const TABS: {
+    href: string;
+    label: string;
+    Icon: PhosphorIcon;
+    match: (p: string) => boolean;
+}[] = [
+    {
+        href: "/",
+        label: "Home",
+        Icon: House,
+        match: (p) => p === "/",
+    },
     {
         href: "/series",
-        label: "Series",
-        Icon: SeriesIcon,
-        match: (p: string) => p.startsWith("/series"),
+        label: "Library",
+        Icon: SquaresFour,
+        match: (p) => p.startsWith("/series"),
+    },
+    {
+        href: "/rankings",
+        label: "Rankings",
+        Icon: Trophy,
+        match: (p) => p === "/rankings",
     },
     {
         href: "/achievements",
         label: "Awards",
-        Icon: TrophyIcon,
-        match: (p: string) => p.startsWith("/achievements"),
+        Icon: Trophy,
+        match: (p) => p.startsWith("/achievements"),
     },
 ];
 
@@ -64,8 +41,8 @@ export default function MobileTabBar() {
     const pathname = usePathname();
 
     return (
-        <nav className="ios-safe-bottom fixed bottom-0 inset-x-0 z-20 border-t border-cyan-950/70 bg-[#12202f]/95 backdrop-blur-xl md:hidden">
-            <ul className="mx-auto max-w-3xl grid grid-cols-3">
+        <nav className="ios-safe-bottom fixed bottom-0 inset-x-0 z-20 border-t border-[var(--line)] bg-[var(--surface)] md:hidden">
+            <ul className="mx-auto max-w-3xl grid grid-cols-4">
                 {TABS.map((tab) => {
                     const active = tab.match(pathname);
                     return (
@@ -73,18 +50,13 @@ export default function MobileTabBar() {
                             <Link
                                 href={tab.href}
                                 aria-current={active ? "page" : undefined}
-                                className={`tdx-focus-ring relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors ${active
-                                    ? "text-cyan-300"
-                                    : "text-cyan-100/60 hover:text-cyan-100/90"
-                                    }`}
+                                className={`tdx-focus-ring relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 py-2 text-[10.5px] font-medium transition-colors ${
+                                    active
+                                        ? "text-[var(--accent-primary)]"
+                                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                }`}
                             >
-                                {active && (
-                                    <span
-                                        className="absolute top-0 h-0.5 w-10 rounded-full bg-cyan-400"
-                                        aria-hidden
-                                    />
-                                )}
-                                <tab.Icon />
+                                <tab.Icon size={17} weight={active ? "fill" : "regular"} />
                                 {tab.label}
                             </Link>
                         </li>

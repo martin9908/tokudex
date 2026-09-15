@@ -41,9 +41,12 @@ export function shareEmoji(kind: string): string {
 }
 
 function classify(shareKey: string): { kind: ShareKind; subtitle: string } {
-    if (shareKey.startsWith("rank-")) return { kind: "rank", subtitle: "Rank reached on TokuDex" };
-    if (shareKey.startsWith("col-")) return { kind: "trophy", subtitle: "Franchise trophy earned" };
-    if (shareKey.startsWith("series-")) return { kind: "series", subtitle: "Series completed" };
+    if (shareKey.startsWith("rank-"))
+        return { kind: "rank", subtitle: "Rank reached on TokuDex" };
+    if (shareKey.startsWith("col-"))
+        return { kind: "trophy", subtitle: "Franchise trophy earned" };
+    if (shareKey.startsWith("series-"))
+        return { kind: "series", subtitle: "Series completed" };
     return { kind: "milestone", subtitle: "Achievement unlocked" };
 }
 
@@ -53,7 +56,9 @@ function classify(shareKey: string): { kind: ShareKind; subtitle: string } {
  * null if the key isn't actually earned. Reuses the same reducers the
  * achievements page uses so labels stay identical.
  */
-export async function buildSnapshotFor(shareKey: string): Promise<ShareSnapshot | null> {
+export async function buildSnapshotFor(
+    shareKey: string,
+): Promise<ShareSnapshot | null> {
     const [view, earnedState] = await Promise.all([
         getAchievementsView(),
         getEarnedAchievements(),
@@ -67,8 +72,8 @@ export async function buildSnapshotFor(shareKey: string): Promise<ShareSnapshot 
             shareKey,
             kind: "stats",
             title: view.rankCurrent.title,
-            subtitle: "My tokusatsu progress",
-            statLabel: "Episodes logged",
+            subtitle: "My tokusatsu series progress",
+            statLabel: "Tokusatsu episodes logged",
             statValue,
         };
     }
@@ -77,9 +82,19 @@ export async function buildSnapshotFor(shareKey: string): Promise<ShareSnapshot 
     if (!earnedState.earned.includes(shareKey)) return null;
 
     const { kind, subtitle } = classify(shareKey);
-    const title = kind === "rank" ? view.rankCurrent.title : earnedState.labels[shareKey] ?? shareKey;
+    const title =
+        kind === "rank"
+            ? view.rankCurrent.title
+            : (earnedState.labels[shareKey] ?? shareKey);
 
-    return { shareKey, kind, title, subtitle, statLabel: "Episodes logged", statValue };
+    return {
+        shareKey,
+        kind,
+        title,
+        subtitle,
+        statLabel: "Tokusatsu episodes logged",
+        statValue,
+    };
 }
 
 /** Opaque, non-guessable slug for a public share URL. */
@@ -92,7 +107,9 @@ export async function getShareCard(slug: string): Promise<ShareCard | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("share_cards")
-        .select("slug, kind, title, subtitle, stat_label, stat_value, display_name")
+        .select(
+            "slug, kind, title, subtitle, stat_label, stat_value, display_name",
+        )
         .eq("slug", slug)
         .maybeSingle();
     return (data as ShareCard | null) ?? null;

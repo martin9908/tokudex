@@ -20,7 +20,7 @@ export default function ProgressBar({ value, max, label, size = "md", className 
             aria-valuemin={0}
             aria-valuemax={100}
             aria-label={ariaLabel}
-            className={`${trackHeight[size]} w-full rounded-full bg-cyan-950/80 overflow-hidden ${className}`}
+            className={`${trackHeight[size]} w-full rounded-full bg-[var(--sunk)] overflow-hidden ${className}`}
         >
             <div
                 className="h-full rounded-full transition-all"

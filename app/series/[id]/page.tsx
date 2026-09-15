@@ -1,410 +1,395 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import EpisodeList from "../../components/organisms/EpisodeList";
-import AddSeriesButton from "../../components/molecules/AddSeriesButton";
-import LogEpisodeButton from "../../components/organisms/LogEpisodeButton";
-import JsonLd from "../../components/JsonLd";
-import { LinkButton, PosterImage, ProgressBar, buttonClasses } from "../../components/atoms";
-import { statusBadgeClass, statusLabel } from "@/lib/status";
-import { getSeriesById } from "@/lib/supabase/queries";
-import {
-    SITE_NAME,
-    absoluteUrl,
-    seriesPath,
-    seriesUrl,
-    seriesMetaDescription,
-    truncateDescription,
-} from "@/lib/seo";
-
-type SeriesDetailPageProps = {
-    params: Promise<{ id: string }>;
-};
-
-export async function generateMetadata({ params }: SeriesDetailPageProps): Promise<Metadata> {
-    const { id } = await params;
-    let series: Awaited<ReturnType<typeof getSeriesById>> | null = null;
-    try {
-        series = await getSeriesById(id);
-    } catch {
-        series = null;
-    }
-
-    if (!series) {
-        return { title: "Series not found", robots: { index: false, follow: false } };
-    }
-
-    const description = seriesMetaDescription(series);
-    const canonical = seriesPath(id);
-    return {
-        title: series.title,
-        description,
-        alternates: { canonical },
-        openGraph: {
-            type: "video.tv_show",
-            title: `${series.title} · ${SITE_NAME}`,
-            description,
-            url: seriesUrl(id),
-        },
-        twitter: { card: "summary_large_image", title: series.title, description },
-    };
-}
-
-// Builds schema.org structured data for a series (shared by guest + member views).
-function seriesJsonLd(
-    series: {
-        id: string;
-        title: string;
-        synopsis: string | null;
-        franchise: string | null;
-        total_episodes: number | null;
-        cover_image_url: string | null;
-    },
-    episodes: { episode_number: number; title: string | null }[]
-) {
-    return {
-        "@context": "https://schema.org",
-        "@type": "TVSeries",
-        name: series.title,
-        description: truncateDescription(series.synopsis) || undefined,
-        image: series.cover_image_url || undefined,
-        genre: series.franchise || undefined,
-        numberOfEpisodes: series.total_episodes || undefined,
-        url: seriesUrl(series.id),
-        ...(episodes.length
-            ? {
-                  episode: episodes.slice(0, 100).map((e) => ({
-                      "@type": "TVEpisode",
-                      episodeNumber: e.episode_number,
-                      name: e.title || `Episode ${e.episode_number}`,
-                  })),
-              }
-            : {}),
-    };
-}
-
-function breadcrumbJsonLd(title: string, id: string) {
-    return {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
-            { "@type": "ListItem", position: 2, name: "Series Library", item: absoluteUrl("/series") },
-            { "@type": "ListItem", position: 3, name: title, item: seriesUrl(id) },
-        ],
-    };
-}
-
-const HERO_BACKDROP =
-    "bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),radial-gradient(circle_at_12%_82%,rgba(8,167,212,0.10),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]";
-
-export default async function SeriesDetailPage({ params }: SeriesDetailPageProps) {
+import { getRatingSummary } from "@/lib/catalogQueries";
+import { seriesMetaDescription, seriesUrl } from "@/lib/seo";
+import type { CatalogItem, CatalogEpisode } from "@/lib/catalog";
+import EpisodeList from "@/app/components/organisms/EpisodeList";
+import LogEpisodeButton from "@/app/components/organisms/LogEpisodeButton";
+import MovieTracker from "@/app/components/organisms/MovieTracker";
+import TitleRating from "@/app/components/organisms/TitleRating";
+import AddSeriesButton from "@/app/components/molecules/AddSeriesButton";
+import { PosterImage, buttonClasses } from "@/app/components/atoms";
+import JsonLd from "@/app/components/JsonLd";
+import ActionForm from "@/app/components/forms/ActionForm";
+import { reportTitle } from "@/app/community/actions";
+type Props = { params: Promise<{ id: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { id } = await params;
     const client = await createClient();
-
-    const {
-        data: { user },
-    } = await client.auth.getUser();
-
-    // Series is public catalog data — readable by guests too.
-    const { data: series, error: seriesError } = await client
+    const { data: s } = await client
         .from("series")
         .select("*")
         .eq("id", id)
-        .single();
-
-    if (seriesError || !series) {
+        .eq("hidden", false)
+        .maybeSingle();
+    return s
+        ? {
+              title: s.title,
+              description: seriesMetaDescription(s),
+              alternates: { canonical: `/series/${id}` },
+              openGraph: {
+                  type: s.format === "movie" ? "video.movie" : "video.tv_show",
+                  url: seriesUrl(id),
+                  title: s.title,
+              },
+          }
+        : {
+              title: "Title unavailable",
+              robots: { index: false, follow: false },
+          };
+}
+export default async function TitleDetail({ params }: Props) {
+    const { id } = await params;
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    const { data, error } = await client
+        .from("series")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+    if (error || !data) notFound();
+    const s = data as CatalogItem;
+    const { data: progress } = user
+        ? await client
+              .from("user_series_progress")
+              .select("*")
+              .eq("series_id", id)
+              .eq("user_id", user.id)
+              .maybeSingle()
+        : { data: null };
+    if (s.hidden)
         return (
-            <div className="max-w-3xl mx-auto px-4 py-8 w-full">
-                <h1 className="text-2xl font-semibold tracking-tight mb-2">Series not found</h1>
-                <p className="text-sm text-cyan-200/70 mb-4">
-                    This series is not available yet.
+            <div className="max-w-3xl mx-auto p-6 space-y-2">
+                <h1 className="text-3xl">{s.title}</h1>
+                <p className="text-[var(--text-secondary)]">
+                    This title is currently unavailable. Your tracking history
+                    has been preserved.
                 </p>
-                <Link href="/series" className="text-sm font-medium text-cyan-300 hover:text-cyan-200">
-                    Back to Series Library
+                {progress && (
+                    <p className="text-[var(--text-secondary)]">
+                        {s.format === "movie"
+                            ? progress.current_episode === 1
+                                ? "Watched"
+                                : "Plan to Watch"
+                            : `Episode ${progress.current_episode}`}
+                    </p>
+                )}
+                <Link href="/" className="text-[var(--accent-primary)] block">
+                    Back to tracker
                 </Link>
             </div>
         );
-    }
-
-    // Get episodes (public catalog data)
-    const { data: episodes = [] } = await client
-        .from("episodes")
-        .select("*")
-        .eq("series_id", id)
-        .order("episode_number", { ascending: true });
-
-    // Series + episodes are public catalog data — guests get the full read-only
-    // view (crawlable for SEO). Tracking actions stay in the authed branch below.
-    if (!user) {
-        return <GuestSeriesDetail series={series} episodes={episodes ?? []} />;
-    }
-
-    // Get user progress
-    const { data: progress } = await client
-        .from("user_series_progress")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("series_id", id)
-        .single();
-
-    const isTracking = !!progress;
-    const currentEpisode = progress?.current_episode || 0;
-    const nextEpisode = Math.min(currentEpisode + 1, series.total_episodes || 1);
-    const hasNext = isTracking && (!series.total_episodes || currentEpisode < series.total_episodes);
-    const nextEpisodeData = (episodes ?? []).find((e) => e.episode_number === nextEpisode);
-    const lastEpisodeData = (episodes ?? []).find((e) => e.episode_number === currentEpisode);
-
+    const [
+        { data: episodeRows, error: episodesError },
+        summary,
+        { data: rating },
+        { data: admin },
+    ] = await Promise.all([
+        client
+            .from("episodes")
+            .select("*")
+            .eq("series_id", id)
+            .order("episode_number"),
+        getRatingSummary(id),
+        user
+            ? client
+                  .from("title_ratings")
+                  .select("score")
+                  .eq("series_id", id)
+                  .eq("user_id", user.id)
+                  .maybeSingle()
+            : Promise.resolve({ data: null }),
+        user
+            ? client.rpc("is_catalog_admin")
+            : Promise.resolve({ data: false }),
+    ]);
+    if (episodesError) throw new Error("Could not load episodes.");
+    const episodes = (episodeRows ?? []) as CatalogEpisode[];
+    const current = progress?.current_episode ?? 0;
+    const next = current + 1;
+    const last = episodes.find((e) => e.episode_number === current);
+    const nextData = episodes.find((e) => e.episode_number === next);
+    const { data: notes } = user
+        ? await client
+              .from("episode_notes")
+              .select("episode_number,note")
+              .eq("series_id", id)
+              .eq("user_id", user.id)
+        : { data: null };
+    const noteMap = Object.fromEntries(
+        (notes ?? []).map((n) => [n.episode_number, n.note]),
+    );
+    const total =
+        s.total_episodes ??
+        Math.max(
+            current,
+            ...episodes.map((e) => e.episode_number),
+            ...Object.keys(noteMap).map(Number),
+            0,
+        );
     return (
-        <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
-            <JsonLd data={seriesJsonLd(series, episodes ?? [])} />
-            <JsonLd data={breadcrumbJsonLd(series.title, series.id)} />
-            <section className="relative overflow-hidden rounded-3xl border border-cyan-900/50 bg-[#05101d] min-h-[330px]">
-                <div className={`absolute inset-0 ${HERO_BACKDROP}`} />
-                <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 md:grid-cols-[1fr_200px] lg:grid-cols-[1fr_220px] gap-6 md:gap-8 items-start">
-                    {/* Poster — above the text on mobile, to the right on md+ */}
-                    <div className="order-first md:order-last">
-                        <div className="relative mx-auto w-[140px] sm:w-[160px] md:w-full md:max-w-[220px]">
-                            <div className="absolute inset-0 rounded-2xl bg-cyan-400/15 blur-2xl" />
-                            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/75 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
-                                <PosterImage
-                                    src={series.cover_image_url}
-                                    alt={series.title}
-                                    sizes="(max-width: 768px) 160px, 220px"
-                                    iconClassName="h-20 w-20 opacity-85"
-                                    overlay
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="order-last md:order-first">
-                        <p className="text-xs tracking-[0.3em] uppercase text-cyan-300/80 mb-3">
-                            {series.franchise || "Series"}
-                        </p>
-                        <h1 className="text-4xl md:text-5xl font-bold leading-[0.95] mb-3">
-                            {series.title}
-                        </h1>
-                        <p className="text-cyan-100/80 text-base leading-relaxed max-w-2xl mb-5">
-                            {series.synopsis}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-cyan-200/75 mb-4">
-                            {series.original_run && (
-                                <>
-                                    <span>{series.original_run}</span>
-                                    <span className="opacity-40">|</span>
-                                </>
-                            )}
-                            <span>{series.total_episodes || "?"} Episodes</span>
-                            <span
-                                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(progress?.status)}`}
-                            >
-                                {statusLabel(progress?.status)}
-                            </span>
-                        </div>
-
-                        <div className="max-w-lg mb-5">
-                            <ProgressBar
-                                value={currentEpisode}
-                                max={series.total_episodes || 1}
-                                label={`${currentEpisode} of ${series.total_episodes || "?"} episodes tracked`}
-                                className="mb-1.5"
-                            />
-                            <p className="text-sm text-cyan-100/70">
-                                {currentEpisode} / {series.total_episodes || "?"} episodes tracked
-                            </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                            {isTracking ? (
-                                hasNext ? (
-                                    <LogEpisodeButton
-                                        seriesId={series.id}
-                                        seriesTitle={series.title}
-                                        episodeNumber={nextEpisode}
-                                        episodeTitle={nextEpisodeData?.title ?? null}
-                                        episodeSynopsis={nextEpisodeData?.synopsis ?? null}
-                                        episodeType={nextEpisodeData?.episode_type ?? null}
-                                        className={buttonClasses({ variant: "primary", className: "px-5" })}
-                                    />
-                                ) : (
-                                    <span className="inline-flex min-h-[44px] items-center rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 text-sm font-medium text-emerald-200">
-                                        ✓ Series completed
-                                    </span>
-                                )
-                            ) : (
-                                <AddSeriesButton seriesId={series.id} className="min-h-[44px]" />
-                            )}
-                            <a
-                                href="#episode-list"
-                                className="tdx-focus-ring rounded-lg text-sm text-cyan-300/85 hover:text-cyan-200"
-                            >
-                                Browse episodes ↓
-                            </a>
-                        </div>
-
-                        {!isTracking && (
-                            <p className="mt-3 text-xs text-cyan-200/75">
-                                Add this series to your tracker, or tap an episode below to start logging.
-                            </p>
-                        )}
-
-                        <p className="mt-5 max-w-lg text-xs text-cyan-200/60">
-                            TokuDex remembers your progress and recaps — it doesn&apos;t stream episodes.
-                        </p>
-                        {series.copyright_notice && (
-                            <p className="mt-4 text-[11px] text-cyan-200/45">
-                                {series.copyright_notice}
-                            </p>
-                        )}
-                    </div>
+        <div className="max-w-5xl mx-auto px-4 py-6 pb-24 space-y-5">
+            <JsonLd
+                data={{
+                    "@context": "https://schema.org",
+                    "@type": s.format === "movie" ? "Movie" : "TVSeries",
+                    name: s.title,
+                    description: s.synopsis ?? undefined,
+                    image: s.cover_image_url ?? undefined,
+                    url: seriesUrl(id),
+                    ...(s.format === "movie"
+                        ? {
+                              duration: s.runtime_minutes
+                                  ? `PT${s.runtime_minutes}M`
+                                  : undefined,
+                          }
+                        : { numberOfEpisodes: s.total_episodes ?? undefined }),
+                    ...(summary
+                        ? {
+                              aggregateRating: {
+                                  "@type": "AggregateRating",
+                                  ratingValue: Number(summary.average_score),
+                                  ratingCount: Number(summary.vote_count),
+                                  bestRating: 10,
+                                  worstRating: 1,
+                              },
+                          }
+                        : {}),
+                }}
+            />
+            <section className="tdx-panel p-5 md:p-6 flex flex-col sm:flex-row gap-5">
+                <div className="relative aspect-[3/4] w-36 sm:w-[140px] shrink-0 rounded-md overflow-hidden">
+                    <PosterImage
+                        src={s.cover_image_url}
+                        alt={s.title}
+                        sizes="192px"
+                    />
                 </div>
-            </section>
-
-            {isTracking && currentEpisode >= 1 && (
-                <section className="rounded-2xl border border-cyan-600/40 bg-cyan-500/[0.07] p-4 md:p-5">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300/80 mb-1">
-                        Where you left off
-                    </p>
-                    <h2 className="text-lg font-semibold">
-                        Episode {currentEpisode}
-                        {lastEpisodeData?.title ? ` · ${lastEpisodeData.title}` : ""}
-                    </h2>
-                    {lastEpisodeData?.synopsis ? (
-                        <p className="mt-2 text-sm text-cyan-100/85 leading-relaxed max-w-3xl">
-                            {lastEpisodeData.synopsis}
-                        </p>
-                    ) : (
-                        <p className="mt-2 text-sm text-cyan-200/60">
-                            No recap available for this episode yet.
+                <div className="flex-1 min-w-0">
+                    <Link
+                        href="/series"
+                        className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)]"
+                    >
+                        ← Library
+                    </Link>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                        {s.category !== "other" && (
+                            <span className="inline-flex items-center rounded-md bg-[var(--accent-tint)] text-[var(--accent-on)] text-[11px] px-2 py-0.5 capitalize">
+                                {s.category}
+                            </span>
+                        )}
+                        <span className="text-[11.5px] text-[var(--text-secondary)]">
+                            {[
+                                s.format === "movie" ? "Movie" : "Series",
+                                s.release_year ?? null,
+                                s.format === "movie"
+                                    ? s.runtime_minutes
+                                        ? `${s.runtime_minutes} min`
+                                        : null
+                                    : (s.total_episodes ?? "?") + " episodes",
+                                progress?.status
+                                    ? progress.status
+                                          .replace("_", " ")
+                                          .replace(/^\w/, (c: string) =>
+                                              c.toUpperCase(),
+                                          )
+                                    : null,
+                            ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                        </span>
+                    </div>
+                    <h1 className="text-[34px] font-medium leading-[1.1] tracking-[-0.015em] mt-2">
+                        {s.title}
+                    </h1>
+                    {s.franchise && (
+                        <p className="text-[var(--text-secondary)] text-sm mt-1">
+                            {s.franchise}
                         </p>
                     )}
-                </section>
-            )}
-
-            <section id="episode-list" className="scroll-mt-20 tdx-panel p-4 md:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <h2 className="text-2xl font-semibold">Episode List</h2>
-                    <p className="text-sm text-cyan-200/65">Tap an episode to log it in a popup</p>
-                </div>
-                {series.total_episodes && series.total_episodes > 0 ? (
-                    <EpisodeList
-                        seriesId={series.id}
-                        seriesTitle={series.title}
-                        totalEpisodes={series.total_episodes}
-                        currentEpisode={currentEpisode}
-                        episodes={episodes ?? []}
-                    />
-                ) : (
-                    <p className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-4 text-sm text-cyan-100/70">
-                        No episodes are listed for this series yet.
+                    <p className="text-[13.5px] leading-[1.55] text-[var(--text-secondary)] max-w-[560px] mt-2">
+                        {s.synopsis}
                     </p>
-                )}
-            </section>
-        </div>
-    );
-}
-
-type GuestDetailSeries = {
-    id: string;
-    title: string;
-    franchise: string | null;
-    synopsis: string | null;
-    total_episodes: number | null;
-    cover_image_url: string | null;
-    original_run: string | null;
-};
-
-type GuestEpisode = {
-    episode_number: number;
-    title: string | null;
-    synopsis: string | null;
-    episode_type?: string | null;
-};
-
-// Read-only series view for guests (latest-per-franchise series only).
-function GuestSeriesDetail({
-    series,
-    episodes,
-}: {
-    series: GuestDetailSeries;
-    episodes: GuestEpisode[];
-}) {
-    return (
-        <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10 w-full space-y-4">
-            <JsonLd data={seriesJsonLd(series, episodes)} />
-            <JsonLd data={breadcrumbJsonLd(series.title, series.id)} />
-            <section className="relative overflow-hidden rounded-3xl border border-cyan-900/50 bg-[#05101d] min-h-[280px]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_20%,rgba(29,111,158,0.45),transparent_42%),linear-gradient(118deg,#020913_8%,#081b2b_54%,#030912_100%)]" />
-                <div className="relative z-10 p-6 md:p-8 grid grid-cols-1 md:grid-cols-[1fr_200px] gap-6 md:gap-8 items-start">
-                    <div className="order-first md:order-last">
-                        <div className="relative mx-auto w-[140px] sm:w-[160px] md:w-full md:max-w-[200px]">
-                            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-700/45 bg-[#071321]/75">
-                                <PosterImage
-                                    src={series.cover_image_url}
-                                    alt={series.title}
-                                    sizes="(max-width: 768px) 160px, 200px"
-                                    iconClassName="h-16 w-16 opacity-85"
+                    <div className="flex flex-wrap items-center gap-2.5 mt-4">
+                        {!user ? (
+                            <Link
+                                href="/login"
+                                className={buttonClasses({ size: "sm" })}
+                            >
+                                Sign in to track and rate
+                            </Link>
+                        ) : s.format === "series" && !progress ? (
+                            <AddSeriesButton seriesId={id} />
+                        ) : null}
+                        {user &&
+                            s.format === "series" &&
+                            progress &&
+                            (!s.total_episodes ||
+                                current < s.total_episodes) && (
+                                <LogEpisodeButton
+                                    seriesId={id}
+                                    seriesTitle={s.title}
+                                    episodeNumber={next}
+                                    episodeTitle={nextData?.title}
+                                    episodeSynopsis={nextData?.synopsis}
+                                    className={buttonClasses({ size: "sm" })}
                                 />
+                            )}
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm text-[var(--accent-primary)] mt-3">
+                        <Link href={`/community/new?id=${id}`}>
+                            Suggest a correction
+                        </Link>
+                        {admin && (
+                            <Link href={`/admin?id=${id}`}>Manage title</Link>
+                        )}
+                    </div>
+                </div>
+                {user && s.format === "series" && progress && s.total_episodes ? (
+                    <div className="text-right flex-none">
+                        <div
+                            className="w-[92px] h-[92px] rounded-full ml-auto grid place-items-center"
+                            style={{
+                                background: `conic-gradient(var(--accent-primary) 0 ${Math.round((current / s.total_episodes) * 100)}%, var(--sunk) 0)`,
+                            }}
+                        >
+                            <div className="w-[74px] h-[74px] rounded-full bg-[var(--background)] grid place-items-center text-center">
+                                <div>
+                                    <p className="text-lg font-medium leading-none">
+                                        {Math.round(
+                                            (current / s.total_episodes) * 100,
+                                        )}
+                                        %
+                                    </p>
+                                    <p className="text-[9px] text-[var(--text-secondary)] tracking-[0.05em] mt-1">
+                                        {current} / {s.total_episodes}
+                                    </p>
+                                </div>
                             </div>
                         </div>
+                        <p className="mt-2 text-[11.5px] text-[var(--text-secondary)]">
+                            {s.total_episodes - current} episodes left
+                        </p>
                     </div>
-                    <div className="order-last md:order-first">
-                        <p className="text-xs tracking-[0.3em] uppercase text-cyan-300/80 mb-3">
-                            {series.franchise || "Series"}
-                        </p>
-                        <h1 className="text-4xl md:text-5xl font-bold leading-[0.95] mb-3">
-                            {series.title}
-                        </h1>
-                        <p className="text-cyan-100/80 text-base leading-relaxed max-w-2xl mb-5">
-                            {series.synopsis}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-cyan-200/75 mb-5">
-                            {series.original_run && (
-                                <>
-                                    <span>{series.original_run}</span>
-                                    <span className="opacity-40">|</span>
-                                </>
+                ) : null}
+            </section>
+            {s.format === "movie" && user && (
+                <MovieTracker
+                    id={id}
+                    watched={current === 1}
+                    initialNote={progress?.movie_note ?? ""}
+                />
+            )}
+            {s.format === "series" && (
+                <>
+                    {user && current > 0 && (
+                        <section className="tdx-panel p-5 border-l-2 border-l-[var(--accent-primary)]">
+                            <h2 className="text-[10px] uppercase tracking-[0.13em] text-[var(--accent-primary)]">
+                                Where you left off · Episode {current}
+                            </h2>
+                            <p className="mt-1 font-medium">{last?.title}</p>
+                            <p className="mt-2 text-[var(--text-secondary)]">
+                                {last?.synopsis ?? "No recap available yet."}
+                            </p>
+                            {noteMap[current] && (
+                                <div className="mt-3 pt-3 border-t border-[var(--line)]">
+                                    <h3 className="text-sm font-medium">
+                                        Your private note
+                                    </h3>
+                                    <p className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] mt-1">
+                                        {noteMap[current]}
+                                    </p>
+                                </div>
                             )}
-                            <span>{series.total_episodes || "?"} Episodes</span>
-                            <span className="rounded-full border border-cyan-600/40 bg-cyan-500/15 px-2 py-0.5 text-xs font-medium text-cyan-200">
-                                Guest preview
-                            </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <LinkButton href="/login" className="px-5">
-                                Sign up to track this series
-                            </LinkButton>
-                            <a
-                                href="#episode-list"
-                                className="tdx-focus-ring rounded-lg text-sm text-cyan-300/85 hover:text-cyan-200"
-                            >
-                                Browse episodes ↓
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section id="episode-list" className="scroll-mt-20 tdx-panel p-4 md:p-5">
-                <h2 className="text-2xl font-semibold mb-4">Episode List</h2>
-                {series.total_episodes && series.total_episodes > 0 ? (
-                    <EpisodeList
-                        guest
-                        seriesId={series.id}
-                        seriesTitle={series.title}
-                        totalEpisodes={series.total_episodes}
-                        currentEpisode={0}
-                        episodes={episodes}
+                        </section>
+                    )}
+                    <section className="tdx-panel p-5">
+                        <h2 className="text-lg mb-3">Episodes</h2>
+                        {!s.total_episodes && (
+                            <p className="text-sm mb-3 text-[var(--text-secondary)]">
+                                This run has no confirmed total yet. You can
+                                keep logging episodes as you watch.
+                            </p>
+                        )}
+                        {total > 0 ? (
+                            <EpisodeList
+                                seriesId={id}
+                                seriesTitle={s.title}
+                                totalEpisodes={total}
+                                currentEpisode={current}
+                                episodes={episodes}
+                                guest={!user}
+                                notes={noteMap}
+                                allowMarkAll={s.total_episodes !== null}
+                            />
+                        ) : (
+                            <p className="text-[var(--text-secondary)]">
+                                No episodes listed yet.{" "}
+                                <Link
+                                    className="underline text-[var(--accent-primary)]"
+                                    href={`/community/new?id=${id}`}
+                                >
+                                    Contribute episode details.
+                                </Link>
+                            </p>
+                        )}
+                    </section>
+                </>
+            )}
+            <section className="tdx-panel p-5 space-y-3">
+                <h2 className="text-lg">Community rating</h2>
+                <p className="text-[var(--text-secondary)] text-sm">
+                    {summary
+                        ? `${Number(summary.average_score).toFixed(1)}/10 · ${summary.vote_count} ${Number(summary.vote_count) === 1 ? "rating" : "ratings"}`
+                        : "Not yet rated"}
+                </p>
+                {user && (
+                    <TitleRating
+                        id={id}
+                        initialScore={rating?.score ?? null}
+                        eligible={
+                            s.format === "movie"
+                                ? current === 1 &&
+                                  progress?.status === "completed"
+                                : current >= 1
+                        }
                     />
-                ) : (
-                    <p className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-4 text-sm text-cyan-100/70">
-                        No episodes are listed for this series yet.
-                    </p>
                 )}
+                <Link
+                    className="block text-sm text-[var(--accent-primary)]"
+                    href="/rankings"
+                >
+                    See community rankings →
+                </Link>
             </section>
+            {user && (
+                <details className="tdx-panel p-4">
+                    <summary className="cursor-pointer text-sm text-[var(--text-secondary)]">
+                        Report inaccurate or abusive content
+                    </summary>
+                    <ActionForm action={reportTitle}>
+                        <input type="hidden" name="id" value={id} />
+                        <label className="block text-sm text-[var(--text-secondary)] mt-3">
+                            What needs attention?
+                            <textarea
+                                required
+                                maxLength={2000}
+                                name="reason"
+                                className="tdx-field p-3 mt-1 text-[var(--text-primary)]"
+                            />
+                        </label>
+                        <button
+                            className={`${buttonClasses({ variant: "secondary", size: "sm" })} mt-3`}
+                        >
+                            Submit report
+                        </button>
+                    </ActionForm>
+                </details>
+            )}
         </div>
     );
 }
-

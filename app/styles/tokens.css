@@ -1,22 +1,29 @@
 :root {
-  /* Core color tokens */
-  --background: #060b13;
-  --surface: #0c1622;
-  --surface-elevated: #12202f;
-  --accent-primary: #00c8ff;
+  /* Core color tokens — Nocturne: flat slate surfaces, hairline edges, cyan accent */
+  --background: #1f232c;
+  --surface: #272c37;
+  --surface-elevated: #2f3542;
+  --line: #39404e;
+  --sunk: #181b22;
+  --accent-primary: #c2564e;
   --accent-secondary: #7a5cff;
-  --success: #3ddc97;
-  --warning: #ffc857;
-  --error: #ff5a5f;
-  --text-primary: #ffffff;
-  --text-secondary: #98a2b3;
-  --text-muted: #667085;
+  --accent-text: #edaaa4;
+  --accent-tint: #4d1d1a;
+  --accent-on: #f8d5d1;
+  --success: #6bbf8a;
+  --success-tint: #22452f;
+  --warning: #d8a24b;
+  --warning-tint: #4a3616;
+  --error: #8f322c;
+  --text-primary: #eceef2;
+  --text-secondary: #99a1b0;
+  --text-muted: #6d7484;
 
   /* Radius tokens */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
 
   /* Spacing tokens (8-point grid with the allowed values) */
   --space-0-5: 4px;
@@ -43,8 +50,13 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
+  --color-line: var(--line);
+  --color-sunk: var(--sunk);
   --color-accent-primary: var(--accent-primary);
   --color-accent-secondary: var(--accent-secondary);
+  --color-accent-text: var(--accent-text);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-on: var(--accent-on);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-error: var(--error);
