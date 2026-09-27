@@ -67,7 +67,7 @@ export default async function GuestHome() {
                     </Link>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {series.map((s) => (
+                    {series.map((s, i) => (
                         <Link
                             key={s.id}
                             href={`/series/${s.id}`}
@@ -78,6 +78,7 @@ export default async function GuestHome() {
                                     src={s.cover_image_url}
                                     alt={s.title}
                                     sizes="(max-width: 640px) 45vw, 220px"
+                                    loading={i < 5 ? "eager" : undefined}
                                 />
                             </div>
                             <p className="text-[13px] font-medium leading-[1.25]">

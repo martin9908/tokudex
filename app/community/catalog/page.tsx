@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react/ssr";
 import { getCatalogPage, getCatalogCredits } from "@/lib/catalogQueries";
-import { DEX_FILTERS, type DexFilter } from "@/lib/catalog";
+import { DEX_FILTERS, franchiseFamily, type DexFilter } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { PosterImage, HairlineRule, buttonClasses } from "@/app/components/atoms";
 import {
@@ -17,16 +17,6 @@ export const metadata: Metadata = {
         "Every tokusatsu, anime and movie title on TokuDex — added by fans, published by admins.",
     alternates: { canonical: "/community/catalog" },
 };
-
-function family(item: { franchise: string | null; format: string; category: string }) {
-    const f = item.franchise ?? "";
-    if (/sentai/i.test(f)) return "Sentai";
-    if (/rider/i.test(f)) return "Rider";
-    if (/ultra/i.test(f)) return "Ultra";
-    if (item.format === "movie") return "Movie";
-    if (f) return f;
-    return item.category.charAt(0).toUpperCase() + item.category.slice(1);
-}
 
 export default async function SharedCatalog({
     searchParams,
@@ -136,7 +126,7 @@ export default async function SharedCatalog({
                                 </p>
                                 <p className="text-[11.5px] text-[var(--text-secondary)] mt-1">
                                     {[
-                                        family(s),
+                                        franchiseFamily(s),
                                         s.release_year,
                                         s.format === "movie"
                                             ? s.runtime_minutes

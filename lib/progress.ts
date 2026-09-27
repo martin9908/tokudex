@@ -22,6 +22,7 @@ export type WatchItem = {
         cover_image_url: string | null;
         copyright_notice: string | null;
         release_year: number | null;
+        runtime_minutes: number | null;
     };
 };
 
@@ -66,6 +67,7 @@ export function toWatchItems(rows: ProgressRow[]): WatchItem[] {
                 cover_image_url: row.series.cover_image_url,
                 copyright_notice: row.series.copyright_notice,
                 release_year: row.series.release_year,
+                runtime_minutes: row.series.runtime_minutes ?? null,
             },
         }));
 }

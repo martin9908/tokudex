@@ -587,13 +587,13 @@ test("database workflows, RLS and rankings", async (t) => {
                 await actor(member);
                 const feed = (
                     await db.query(
-                        "select kind,episode from public.activity where user_id=$1 order by kind",
+                        "select kind,episode,episodes from public.activity where user_id=$1 order by kind",
                         [fan],
                     )
                 ).rows;
                 assert.deepEqual(feed, [
-                    { kind: "logged", episode: 3 },
-                    { kind: "shelved", episode: 3 },
+                    { kind: "logged", episode: 3, episodes: 3 },
+                    { kind: "shelved", episode: 3, episodes: 0 },
                 ]);
                 await rejects(
                     () =>
@@ -606,26 +606,25 @@ test("database workflows, RLS and rankings", async (t) => {
                 await actor(fan);
                 await rpc("set_profile", [profile.handle, null, false]);
                 await rpc("save_tracking", [feedTitle, 5, "watching", null, null, false]);
+                const count = async (who: string) =>
+                    (
+                        await db.query(
+                            "select count(*)::int as n from public.activity where user_id=$1",
+                            [who],
+                        )
+                    ).rows[0].n;
+                // Switching sharing off hides past rows from others, but the
+                // owner keeps their full history for the year chart.
+                assert.equal(await count(fan), 3);
                 await actor(member);
-                assert.equal(
-                    (
-                        await db.query(
-                            "select count(*)::int as n from public.activity where user_id=$1",
-                            [fan],
-                        )
-                    ).rows[0].n,
-                    2,
-                );
-                // A member with no profile row never appears in the feed.
-                assert.equal(
-                    (
-                        await db.query(
-                            "select count(*)::int as n from public.activity where user_id=$1",
-                            [member],
-                        )
-                    ).rows[0].n,
-                    0,
-                );
+                assert.equal(await count(fan), 0);
+                // A member with no profile row never appears in the feed,
+                // though their own history is still recorded.
+                const ownBefore = await count(member);
+                await rpc("save_tracking", [feedTitle, 2, "watching", null, null, false]);
+                assert.equal(await count(member), ownBefore + 1);
+                await actor(fan);
+                assert.equal(await count(member), 0);
                 // Publishing a new title credits its author.
                 await actor(fan);
                 await rpc("set_profile", [profile.handle, null, true]);

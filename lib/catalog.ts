@@ -80,6 +80,20 @@ export function catalogParams(
 export function isTokuSeries(item: { category?: string; format?: string }) {
     return item.category === "tokusatsu" && item.format === "series";
 }
+/** Short family label for cards and rows: Sentai, Rider, Ultra, Movie, … */
+export function franchiseFamily(item: {
+    franchise: string | null;
+    format: string;
+    category: string;
+}) {
+    const f = item.franchise ?? "";
+    if (/sentai/i.test(f)) return "Sentai";
+    if (/rider/i.test(f)) return "Rider";
+    if (/ultra/i.test(f)) return "Ultra";
+    if (item.format === "movie") return "Movie";
+    if (f) return f;
+    return item.category.charAt(0).toUpperCase() + item.category.slice(1);
+}
 export function normalizeTitle(title: string) {
     return title.trim().replace(/\s+/g, " ").toLowerCase();
 }

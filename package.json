@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "import:episodes": "node scripts/import-episodes.mjs",
-    "test": "tsx --test tests/catalog.test.ts",
+    "test": "tsx --test tests/catalog.test.ts tests/yearActivity.test.ts",
     "test:db": "tsx --test tests/database.test.ts tests/migrations.test.ts",
     "test:e2e": "playwright test"
   },

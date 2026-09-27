@@ -12,6 +12,8 @@ interface PosterImageProps {
     pendingLabel?: React.ReactNode;
     /** Extra classes for the placeholder tile (font size, padding). */
     pendingClassName?: string;
+    /** Pass "eager" for above-the-fold heroes that can be the LCP element. */
+    loading?: "lazy" | "eager";
 }
 
 /**
@@ -28,6 +30,7 @@ export default function PosterImage({
     imageClassName = "object-cover object-center",
     pendingLabel = "Poster pending",
     pendingClassName = "",
+    loading,
 }: PosterImageProps) {
     if (src) {
         return (
@@ -36,6 +39,7 @@ export default function PosterImage({
                 alt={alt}
                 fill
                 sizes={sizes}
+                loading={loading}
                 className={imageClassName}
             />
         );

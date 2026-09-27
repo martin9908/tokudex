@@ -8,10 +8,16 @@ import {
     monthName,
     isQuiet,
     daysAgoIso,
-    type WatchItem,
 } from "@/lib/progress";
 import { episodeTypeLabel } from "@/lib/episodeTypes";
-import { getProfile } from "@/lib/profiles";
+import { franchiseFamily } from "@/lib/catalog";
+import { getCatalogCredits } from "@/lib/catalogQueries";
+import { getAchievementsView } from "@/lib/achievementState";
+import {
+    summarizeYear,
+    rowEpisodes,
+    type ActivityRow,
+} from "@/lib/yearActivity";
 import {
     PosterImage,
     BigNumber,
@@ -23,6 +29,9 @@ import {
 import LogEpisodeButton from "./components/organisms/LogEpisodeButton";
 import GuestHome from "./components/organisms/GuestHome";
 import QuickLogButton from "./components/molecules/QuickLogButton";
+import YearChart from "./components/organisms/YearChart";
+import CloseToUnlocking from "./components/organisms/CloseToUnlocking";
+import NewInDex, { type NewTitle } from "./components/organisms/NewInDex";
 import { getGuestSeries } from "@/lib/guest";
 
 function Stat({
@@ -55,15 +64,6 @@ function Stat({
             </div>
         </div>
     );
-}
-
-function franchiseShort(item: WatchItem["series"]): string {
-    const f = item.franchise ?? "";
-    if (/sentai/i.test(f)) return "Sentai";
-    if (/rider/i.test(f)) return "Rider";
-    if (/ultra/i.test(f)) return "Ultra";
-    if (item.format === "movie") return "Movie";
-    return f || item.category.charAt(0).toUpperCase() + item.category.slice(1);
 }
 
 export default async function Home() {
@@ -99,12 +99,17 @@ export default async function Home() {
         .slice(0, 3);
 
     const since = daysAgoIso(7);
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const [
         { data: nextEpisode },
-        { data: weekRows },
+        { data: activityRows },
         { data: submissionRows },
-        profile,
         suggestions,
+        awards,
+        { data: newRows },
+        { count: addedThisMonth },
     ] = await Promise.all([
         upNext
             ? client
@@ -116,22 +121,41 @@ export default async function Home() {
             : Promise.resolve({ data: null }),
         client
             .from("activity")
-            .select("id")
+            .select("kind, episodes, created_at, series(title)")
             .eq("user_id", user.id)
-            .in("kind", ["logged", "finished"])
-            .gte("created_at", since),
+            .in("kind", ["logged", "finished", "shelved"])
+            .gte("created_at", since < yearStart ? since : yearStart),
         client
             .from("catalog_submissions")
             .select("status, series_id, base_revision")
             .eq("author_id", user.id),
-        getProfile(user.id),
         items.length === 0 ? getGuestSeries() : Promise.resolve([]),
+        getAchievementsView(),
+        client
+            .from("series")
+            .select(
+                "id, title, franchise, category, format, release_year, cover_image_url",
+            )
+            .eq("hidden", false)
+            .order("created_at", { ascending: false })
+            .limit(6),
+        client
+            .from("series")
+            .select("id", { count: "exact", head: true })
+            .eq("hidden", false)
+            .gte("created_at", monthStart),
     ]);
 
-    const thisWeek = weekRows?.length ?? 0;
-    const activeThisWeek = items.filter(
-        (i) => new Date(i.progress.last_watched_at).toISOString() >= since,
-    ).length;
+    const activity = (activityRows ?? []) as unknown as ActivityRow[];
+    const year = summarizeYear(
+        activity.filter((r) => new Date(r.created_at) >= new Date(yearStart)),
+        now,
+    );
+    const thisWeek = activity
+        .filter((r) => new Date(r.created_at) >= new Date(since))
+        .reduce((n, r) => n + rowEpisodes(r), 0);
+    const newTitles = (newRows ?? []) as NewTitle[];
+    const credits = await getCatalogCredits(newTitles.map((s) => s.id));
     const quiet = going.filter((i) => isQuiet(i.progress.last_watched_at)).length;
     const lastFinished = doneLately[0]?.progress.last_watched_at;
     const someday = items.filter((i) => i.progress.status === "plan_to_watch");
@@ -162,11 +186,7 @@ export default async function Home() {
                     first
                     value={logged}
                     label="logged"
-                    hint={
-                        profile?.share_activity === false
-                            ? `${activeThisWeek} title${activeThisWeek === 1 ? "" : "s"} active this week`
-                            : `${thisWeek} this week`
-                    }
+                    hint={`${thisWeek} this week`}
                     tone="text"
                 />
                 <Stat
@@ -295,6 +315,7 @@ export default async function Home() {
                                             src={upNext.series.cover_image_url}
                                             alt={upNext.series.title}
                                             sizes="188px"
+                                            loading="eager"
                                         />
                                     </Link>
                                     <div className="flex-1 min-w-0 flex flex-col">
@@ -328,10 +349,18 @@ export default async function Home() {
                                                     {nextEpisode?.title ??
                                                         `Episode ${next}`}
                                                 </p>
-                                                <div className="flex gap-1.5 mt-[9px] flex-wrap">
-                                                    <TagChip accent>
-                                                        {nextType ?? "Arc"}
-                                                    </TagChip>
+                                                <div className="flex gap-1.5 mt-[9px] flex-wrap empty:hidden">
+                                                    {nextType && (
+                                                        <TagChip accent>
+                                                            {nextType}
+                                                        </TagChip>
+                                                    )}
+                                                    {upNext.series.runtime_minutes && (
+                                                        <TagChip>
+                                                            {upNext.series.runtime_minutes}{" "}
+                                                            min
+                                                        </TagChip>
+                                                    )}
                                                     {nextEpisode?.air_date && (
                                                         <TagChip>
                                                             {new Date(
@@ -488,13 +517,11 @@ export default async function Home() {
                                                 </Link>
                                                 {onHold ? (
                                                     <p className="text-[11px] md:text-[11px] text-[var(--text-secondary)] mt-[3px]">
-                                                        Shelved at{" "}
-                                                        {p.current_episode}
                                                         {monthName(
                                                             p.last_watched_at,
                                                         )
-                                                            ? ` · nothing since ${monthName(p.last_watched_at)}`
-                                                            : ""}
+                                                            ? `Nothing since ${monthName(p.last_watched_at)}`
+                                                            : "Shelved"}
                                                     </p>
                                                 ) : (
                                                     <>
@@ -502,7 +529,7 @@ export default async function Home() {
                                                             {p.current_episode} of{" "}
                                                             {s.total_episodes ??
                                                                 "?"}{" "}
-                                                            · {franchiseShort(s)}
+                                                            · {franchiseFamily(s)}
                                                             {s.release_year
                                                                 ? ` · ${s.release_year}`
                                                                 : ""}
@@ -566,6 +593,34 @@ export default async function Home() {
                         )}
                     </aside>
                 </div>
+            )}
+
+            {items.length > 0 && (
+                <>
+                    <HairlineRule />
+                    <div className="grid md:grid-cols-2">
+                        <div className="md:border-r md:border-[var(--line)]">
+                            <YearChart summary={year} />
+                        </div>
+                        {awards && (
+                            <>
+                                <HairlineRule className="md:hidden" inset={34} />
+                                <CloseToUnlocking view={awards} />
+                            </>
+                        )}
+                    </div>
+                </>
+            )}
+
+            {newTitles.length > 0 && (
+                <>
+                    <HairlineRule />
+                    <NewInDex
+                        titles={newTitles}
+                        addedThisMonth={addedThisMonth ?? 0}
+                        credits={credits}
+                    />
+                </>
             )}
         </div>
     );
