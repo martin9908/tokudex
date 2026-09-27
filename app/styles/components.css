@@ -163,6 +163,7 @@
 
   /* Choice tile — a radio rendered as a bordered box (status pickers, category). */
   .tdx-choice {
+    position: relative; /* keeps the sr-only input inside the tile */
     display: flex;
     align-items: center;
     justify-content: center;

@@ -75,7 +75,7 @@ export default function NotificationsList({ notices }: { notices: Notice[] }) {
     const freshCount = notices.filter(isFresh).length;
 
     return (
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-24">
+        <div className="min-w-0">
             <div className="flex items-baseline gap-2.5">
                 <h1 className="text-[20px] tracking-[-0.02em]">Notifications</h1>
                 {freshCount > 0 && (

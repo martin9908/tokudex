@@ -555,6 +555,121 @@ test("database workflows, RLS and rankings", async (t) => {
                 );
             },
         );
+        await t.test(
+            "profiles, the activity feed and the share_activity switch",
+            async () => {
+                const fan = ids[7];
+                await actor(trusted);
+                const feedTitle = (
+                    await submit({ ...base, title: "Feed title" })
+                ).series_id;
+                assert.ok(feedTitle);
+                await actor(fan);
+                await rejects(
+                    () => rpc("set_profile", ["Bad Handle!", null, null]),
+                    /Handles are/,
+                );
+                const profile = await rpc("set_profile", [
+                    "Hoshino_" + ids[7].slice(0, 4),
+                    "Hoshino",
+                    null,
+                ]);
+                assert.match(profile.handle, /^hoshino_/);
+                assert.equal(profile.share_activity, true);
+                await actor(member);
+                await rejects(
+                    () => rpc("set_profile", [profile.handle, null, null]),
+                    /taken/,
+                );
+                await actor(fan);
+                await rpc("save_tracking", [feedTitle, 3, "watching", null, null, false]);
+                await rpc("save_tracking", [feedTitle, 3, "on_hold", null, null, false]);
+                await actor(member);
+                const feed = (
+                    await db.query(
+                        "select kind,episode from public.activity where user_id=$1 order by kind",
+                        [fan],
+                    )
+                ).rows;
+                assert.deepEqual(feed, [
+                    { kind: "logged", episode: 3 },
+                    { kind: "shelved", episode: 3 },
+                ]);
+                await rejects(
+                    () =>
+                        db.query(
+                            "insert into public.activity(user_id,kind,series_id) values($1,'logged',$2)",
+                            [member, feedTitle],
+                        ),
+                    /row-level security/,
+                );
+                await actor(fan);
+                await rpc("set_profile", [profile.handle, null, false]);
+                await rpc("save_tracking", [feedTitle, 5, "watching", null, null, false]);
+                await actor(member);
+                assert.equal(
+                    (
+                        await db.query(
+                            "select count(*)::int as n from public.activity where user_id=$1",
+                            [fan],
+                        )
+                    ).rows[0].n,
+                    2,
+                );
+                // A member with no profile row never appears in the feed.
+                assert.equal(
+                    (
+                        await db.query(
+                            "select count(*)::int as n from public.activity where user_id=$1",
+                            [member],
+                        )
+                    ).rows[0].n,
+                    0,
+                );
+                // Publishing a new title credits its author.
+                await actor(fan);
+                await rpc("set_profile", [profile.handle, null, true]);
+                const added = await submit({ ...base, title: "Credited Title" });
+                await actor(admin);
+                const created = await rpc("review_catalog", [
+                    added.id,
+                    true,
+                    null,
+                    null,
+                    null,
+                ]);
+                await rpc("publish_catalog_submission", [added.id]);
+                await actor(null);
+                const credits = (
+                    await db.query(
+                        "select handle from public.catalog_credits($1::uuid[])",
+                        [[created]],
+                    )
+                ).rows;
+                assert.equal(credits[0].handle, profile.handle);
+                assert.equal(
+                    (
+                        await db.query(
+                            "select kind from public.activity where series_id=$1",
+                            [created],
+                        )
+                    ).rows[0].kind,
+                    "added",
+                );
+                const page = await rpc("catalog_page", [
+                    "needs_work",
+                    "",
+                    1,
+                    false,
+                ]);
+                assert.ok(
+                    page.items.some(
+                        (i: { id: string; episode_count: number }) =>
+                            i.id === created && i.episode_count === 1,
+                    ),
+                );
+            },
+        );
     } finally {
         await db.query("rollback");
         await db.end();

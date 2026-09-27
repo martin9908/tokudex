@@ -1,211 +1,358 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { Plus } from "@phosphor-icons/react/ssr";
 import { createClient } from "@/lib/supabase/server";
-import { relativeTime } from "@/lib/progress";
-import { buttonClasses } from "@/app/components/atoms";
+import { getProfilesByIds, getProfile } from "@/lib/profiles";
+import { relativeTime, daysAgoIso } from "@/lib/progress";
+import { BigNumber, HairlineRule, buttonClasses } from "../components/atoms";
 
-type Status = "pending" | "published" | "rejected";
-const STATUSES: Status[] = ["pending", "published", "rejected"];
-
-const STATUS_STYLE: Record<
-    Status,
-    { chip: string; border: string; label: string }
-> = {
-    pending: {
-        chip: "tdx-chip-warn",
-        border: "border-l-[var(--warning)]",
-        label: "Pending",
-    },
-    published: {
-        chip: "tdx-chip-ok",
-        border: "border-l-[var(--accent-primary)]",
-        label: "Published",
-    },
-    rejected: {
-        chip: "",
-        border: "border-l-[var(--text-muted)]",
-        label: "Rejected",
-    },
+export const metadata: Metadata = {
+    title: "Community",
+    description: "What other people logged this week, and titles that need a hand.",
+    alternates: { canonical: "/community" },
 };
 
-function shortDate(iso: string) {
-    return new Date(iso).toLocaleDateString(undefined, {
-        day: "numeric",
-        month: "short",
-    });
+type ActivityRow = {
+    id: string;
+    user_id: string;
+    kind: "logged" | "finished" | "shelved" | "added" | "corrected";
+    episode: number | null;
+    created_at: string;
+    series: {
+        id: string;
+        title: string;
+        total_episodes: number | null;
+        format: string;
+    } | null;
+};
+
+function verb(row: ActivityRow) {
+    const title = row.series?.title ?? "a title";
+    switch (row.kind) {
+        case "finished":
+            return `finished ${title}`;
+        case "shelved":
+            return `shelved ${title} at ${row.episode ?? 0}`;
+        case "added":
+            return `added ${title}`;
+        case "corrected":
+            return `corrected ${title}`;
+        default:
+            return `logged ${title} ${row.episode ?? ""}`.trim();
+    }
 }
 
-export default async function Submissions({
+function subline(row: ActivityRow) {
+    const when = relativeTime(row.created_at);
+    const total = row.series?.total_episodes;
+    switch (row.kind) {
+        case "finished":
+            return `${row.series?.format === "movie" ? "Watched" : total ? `All ${total}` : "Done"} · ${when}`;
+        case "shelved":
+            return `${row.episode ?? 0} of ${total ?? "?"} · ${when}`;
+        case "added":
+        case "corrected":
+            return `Published by an admin · ${when}`;
+        default:
+            return `${row.episode ?? 0} of ${total ?? "?"} · ${when}`;
+    }
+}
+
+function bigNumber(row: ActivityRow) {
+    if (row.kind === "finished")
+        return row.series?.format === "movie" ? 1 : (row.series?.total_episodes ?? row.episode ?? 1);
+    if (row.kind === "added" || row.kind === "corrected") return 1;
+    return row.episode ?? 0;
+}
+
+export default async function CommunityHome({
     searchParams,
 }: {
-    searchParams: Promise<{ status?: string }>;
+    searchParams: Promise<{ all?: string }>;
 }) {
+    const { all } = await searchParams;
     const client = await createClient();
     const {
         data: { user },
     } = await client.auth.getUser();
-    if (!user) redirect("/login");
-    const { status: rawStatus } = await searchParams;
-    const filter = (STATUSES as string[]).includes(rawStatus ?? "")
-        ? (rawStatus as Status)
-        : null;
-    const [{ data: submissions, error }, { data: admin }, { data: trust }] =
-        await Promise.all([
-            client
-                .from("catalog_submissions")
-                .select("*")
-                .eq("author_id", user.id)
-                .order("created_at", { ascending: false })
-                .limit(100),
-            client.rpc("is_catalog_admin"),
-            client
-                .from("catalog_trust")
-                .select("*")
-                .eq("user_id", user.id)
-                .maybeSingle(),
-        ]);
-    if (error) throw new Error("Could not load submissions.");
-    const all = submissions ?? [];
-    const counts = Object.fromEntries(
-        STATUSES.map((s) => [s, all.filter((x) => x.status === s).length]),
-    ) as Record<Status, number>;
-    const shown = filter ? all.filter((s) => s.status === filter) : all;
+    const since = daysAgoIso(7);
+    const limit = all ? 100 : 12;
+
+    const [
+        { data: feedRows },
+        { count: weekCount },
+        { data: thinRows },
+        me,
+        { data: mineRows },
+        { data: myCorrections },
+    ] = await Promise.all([
+        client
+            .from("activity")
+            .select(
+                "id, user_id, kind, episode, created_at, series(id, title, total_episodes, format)",
+            )
+            .gte("created_at", since)
+            .order("created_at", { ascending: false })
+            .limit(limit),
+        client
+            .from("activity")
+            .select("id", { count: "exact", head: true })
+            .in("kind", ["logged", "finished"])
+            .gte("created_at", since),
+        client
+            .from("series")
+            .select("id, title, total_episodes, cover_image_url, format")
+            .eq("hidden", false)
+            .is("cover_image_url", null)
+            .order("release_year", { ascending: false, nullsFirst: false })
+            .limit(3),
+        user ? getProfile(user.id) : Promise.resolve(null),
+        user
+            ? client
+                  .from("user_series_progress")
+                  .select("current_episode, status")
+                  .eq("user_id", user.id)
+            : Promise.resolve({ data: null }),
+        user
+            ? client
+                  .from("catalog_submissions")
+                  .select("status")
+                  .eq("author_id", user.id)
+                  .eq("status", "published")
+                  .not("base_revision", "is", null)
+            : Promise.resolve({ data: null }),
+    ]);
+
+    const feed = ((feedRows ?? []) as unknown as ActivityRow[]).filter(
+        (r) => r.series,
+    );
+    const profiles = await getProfilesByIds(feed.map((r) => r.user_id));
+    const needsHand = await Promise.all(
+        ((thinRows ?? []) as {
+            id: string;
+            title: string;
+            total_episodes: number | null;
+            cover_image_url: string | null;
+            format: string;
+        }[]).map(async (s) => {
+            const { count } = await client
+                .from("episodes")
+                .select("id", { count: "exact", head: true })
+                .eq("series_id", s.id);
+            const missing =
+                s.format === "series" && s.total_episodes
+                    ? Math.max(0, s.total_episodes - (count ?? 0))
+                    : 0;
+            return { ...s, missing };
+        }),
+    );
+
+    const mine = mineRows ?? [];
+    const logged = mine.reduce((n, r) => n + (r.current_episode ?? 0), 0);
+    const finished = mine.filter((r) => r.status === "completed").length;
 
     return (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-24">
-            <div className="flex flex-wrap items-end gap-3">
-                <div className="flex items-baseline gap-2.5">
-                    <h1 className="text-[20px] tracking-[-0.02em]">
-                        My submissions
-                    </h1>
-                    <span className="text-xs text-[var(--text-muted)]">
-                        {all.length} all time
-                    </span>
-                </div>
-                <div className="ml-auto flex items-center gap-3">
-                    {admin && (
-                        <Link
-                            className="text-xs text-[var(--accent-primary)]"
-                            href="/admin"
-                        >
-                            Review queue →
-                        </Link>
-                    )}
+        <div className="w-full pb-24 md:pb-10">
+            <div className="flex items-center gap-3 px-[18px] md:px-[30px] py-[13px] border-b border-[var(--line)] text-[12.5px]">
+                <Link
+                    href="/rankings"
+                    className="tdx-focus-ring rounded-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                    Rankings
+                </Link>
+                <Link
+                    href="/community/catalog"
+                    className="tdx-focus-ring rounded-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                    Shared catalog
+                </Link>
+                {user && (
                     <Link
-                        className={buttonClasses({ variant: "secondary", size: "sm" })}
-                        href="/community/new"
+                        href="/community/submissions"
+                        className="tdx-focus-ring rounded-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
-                        <Plus size={13} aria-hidden />
-                        Add a title
+                        My submissions
                     </Link>
-                </div>
+                )}
+                <Link
+                    href="/community/new"
+                    className={buttonClasses({ size: "sm", className: "ml-auto" })}
+                >
+                    Add a title
+                </Link>
             </div>
 
-            <nav aria-label="Status" className="flex gap-2 mt-3.5 mb-4 flex-wrap">
-                <Link
-                    href="/community"
-                    className="tdx-pill"
-                    aria-current={filter === null ? "page" : undefined}
-                >
-                    All
-                </Link>
-                {STATUSES.map((s) => (
-                    <Link
-                        key={s}
-                        href={`/community?status=${s}`}
-                        className="tdx-pill"
-                        aria-current={filter === s ? "page" : undefined}
-                    >
-                        {STATUS_STYLE[s].label} {counts[s]}
-                    </Link>
-                ))}
-            </nav>
+            <div className="grid md:grid-cols-[minmax(0,1fr)_316px] xl:grid-cols-[minmax(0,1fr)_380px] gap-8 md:gap-[34px] px-[18px] md:px-[30px] pt-[22px] md:pt-[26px] pb-8">
+                <section>
+                    <div className="flex items-baseline gap-3 flex-wrap">
+                        <h1 className="text-[21px] font-medium tracking-[-0.02em]">
+                            This week
+                        </h1>
+                        <span className="text-[12px] text-[var(--text-secondary)]">
+                            {(weekCount ?? 0).toLocaleString()} episode
+                            {weekCount === 1 ? "" : "s"} logged by everyone
+                        </span>
+                    </div>
 
-            {shown.length === 0 ? (
-                <div className="tdx-callout tdx-callout-quiet">
-                    {all.length === 0
-                        ? "Nothing submitted yet. Add a title or suggest a correction from any title page."
-                        : "Nothing with that status."}
-                </div>
-            ) : (
-                <div className="flex flex-col gap-2.5">
-                    {shown.map((s) => {
-                        const style = STATUS_STYLE[s.status as Status] ?? STATUS_STYLE.pending;
-                        const kind = s.series_id && s.status !== "published"
-                            ? "Correction"
-                            : s.series_id && s.payload?.episodes?.length
-                              ? "Correction"
-                              : "New title";
-                        return (
-                            <article
-                                key={s.id}
-                                className={`tdx-panel p-3.5 border-l-[3px] ${style.border}`}
-                            >
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h2 className="text-[13.5px] font-medium">
-                                        {s.status === "published" && s.series_id ? (
-                                            <Link
-                                                href={`/series/${s.series_id}`}
-                                                className="hover:text-[var(--accent-primary)]"
-                                            >
-                                                {s.payload.title}
-                                            </Link>
-                                        ) : (
-                                            s.payload.title
-                                        )}
-                                    </h2>
-                                    <span className={`tdx-chip ${style.chip}`}>
-                                        {style.label}
-                                    </span>
-                                </div>
-                                <p className="text-[11.5px] text-[var(--text-secondary)] mt-1.5 leading-[1.5]">
-                                    {s.status === "published"
-                                        ? `${kind} · live since ${shortDate(s.reviewed_at ?? s.created_at)}`
-                                        : `${kind} · submitted ${relativeTime(s.created_at)}`}
-                                </p>
-                                {s.status === "rejected" && s.reason && (
-                                    <p className="text-[11.5px] text-[var(--text-secondary)] mt-1 leading-[1.5]">
-                                        Reason from the reviewer: &ldquo;{s.reason}&rdquo;
-                                    </p>
-                                )}
-                                {s.status === "rejected" && (
+                    {feed.length === 0 ? (
+                        <p className="mt-[18px] pt-4 border-t border-[var(--line)] text-[13px] text-[var(--text-secondary)] leading-[1.55]">
+                            Nothing logged yet this week. Log an episode and it
+                            shows up here — never your notes, never your ratings.
+                        </p>
+                    ) : (
+                        <div className="flex flex-col mt-[18px]">
+                            {feed.map((row, i) => {
+                                const profile = profiles[row.user_id];
+                                const n = bigNumber(row);
+                                return (
+                                    <div
+                                        key={row.id}
+                                        className={`tdx-row rounded-md flex gap-4 px-3 py-[15px] border-t border-[var(--line)] items-start ${
+                                            i === feed.length - 1
+                                                ? "border-b"
+                                                : ""
+                                        }`}
+                                    >
+                                        <BigNumber
+                                            size={30}
+                                            tone={row.kind === "finished" ? "text" : "mute"}
+                                            className="w-[52px] flex-none leading-[0.9] tracking-[-0.035em]"
+                                        >
+                                            {n}
+                                        </BigNumber>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[14px]">
+                                                <span className="text-[var(--accent-primary)]">
+                                                    {profile
+                                                        ? `@${profile.handle}`
+                                                        : "a fan"}
+                                                </span>{" "}
+                                                {row.series ? (
+                                                    <Link
+                                                        href={`/series/${row.series.id}`}
+                                                        className="tdx-focus-ring rounded-sm"
+                                                    >
+                                                        {verb(row)}
+                                                    </Link>
+                                                ) : (
+                                                    verb(row)
+                                                )}
+                                            </p>
+                                            <p className="text-[12px] text-[var(--text-secondary)] mt-[5px]">
+                                                {subline(row)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    <p className="mt-4 text-[12.5px] text-[var(--text-secondary)]">
+                        Older activity is kept for 90 days
+                        {!all && feed.length >= limit ? (
+                            <>
+                                {" — "}
+                                <Link
+                                    href="/community?all=1"
+                                    className="text-[var(--accent-primary)]"
+                                >
+                                    See the full week
+                                </Link>
+                            </>
+                        ) : (
+                            "."
+                        )}
+                    </p>
+                </section>
+
+                <aside>
+                    <p className="text-[12.5px] text-[var(--text-secondary)]">
+                        Needs a hand
+                    </p>
+                    {needsHand.length === 0 ? (
+                        <p className="mt-3 pt-[13px] border-t border-[var(--line)] text-[12px] text-[var(--text-muted)]">
+                            Every title has art. Nice.
+                        </p>
+                    ) : (
+                        <div className="mt-3 flex flex-col gap-[11px]">
+                            {needsHand.map((s) => (
+                                <div
+                                    key={s.id}
+                                    className="pt-[13px] pb-[13px] border-t border-[var(--line)]"
+                                >
                                     <Link
+                                        href={`/series/${s.id}`}
+                                        className="tdx-focus-ring rounded-sm text-[13.5px]"
+                                    >
+                                        {s.title}
+                                    </Link>
+                                    <p className="text-[12px] text-[var(--text-secondary)] mt-1">
+                                        No poster
+                                        {s.missing
+                                            ? `, ${s.missing} episode${s.missing === 1 ? "" : "s"} missing titles`
+                                            : ""}
+                                    </p>
+                                    <Link
+                                        href={`/community/new?id=${s.id}`}
                                         className={buttonClasses({
+                                            variant: "secondary",
                                             size: "sm",
                                             className: "mt-2.5",
                                         })}
-                                        href={`/community/new?resubmit=${s.id}`}
                                     >
-                                        Submit a revision
+                                        Suggest a fix
                                     </Link>
-                                )}
-                            </article>
-                        );
-                    })}
-                </div>
-            )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
-            <div className="mt-6 tdx-panel p-3.5 text-[11.5px] text-[var(--text-secondary)] leading-[1.6]">
-                <p>
-                    Your member ID:{" "}
-                    <code className="text-[var(--text-primary)]">{user.id}</code>
-                </p>
-                {trust ? (
-                    <p className="mt-1">
-                        Publishing trust: {trust.kind}
-                        {trust.expires_at
-                            ? ` · expires ${new Date(trust.expires_at).toLocaleDateString()}`
-                            : ""}
-                        . Expired trust returns new submissions to review.
+                    <p className="mt-[26px] text-[12.5px] text-[var(--text-secondary)]">
+                        Just you
                     </p>
-                ) : (
-                    <p className="mt-1">
-                        Submissions are reviewed by an admin before they go
-                        live. Ten attempts per day.
-                    </p>
-                )}
+                    {user ? (
+                        <>
+                            <div className="mt-3 pt-[13px] border-t border-[var(--line)] flex flex-col gap-[9px] text-[12.5px] text-[var(--text-secondary)]">
+                                <div className="flex justify-between">
+                                    <span>Episodes logged</span>
+                                    <span className="text-[var(--text-primary)] tabular-nums">
+                                        {logged.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Series finished</span>
+                                    <span className="text-[var(--text-primary)] tabular-nums">
+                                        {finished}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Corrections accepted</span>
+                                    <span className="text-[var(--text-primary)] tabular-nums">
+                                        {myCorrections?.length ?? 0}
+                                    </span>
+                                </div>
+                            </div>
+                            {me && !me.share_activity && (
+                                <p className="mt-3 text-[11.5px] text-[var(--text-muted)] leading-[1.5]">
+                                    Your activity is hidden from the feed —
+                                    switch it on from{" "}
+                                    <Link href="/account" className="text-[var(--accent-primary)]">
+                                        Account
+                                    </Link>
+                                    .
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <p className="mt-3 pt-[13px] border-t border-[var(--line)] text-[12.5px] text-[var(--text-secondary)] leading-[1.55]">
+                            <Link href="/login" className="text-[var(--accent-primary)]">
+                                Sign in
+                            </Link>{" "}
+                            to see your own numbers here.
+                        </p>
+                    )}
+                </aside>
             </div>
+            <HairlineRule />
         </div>
     );
 }

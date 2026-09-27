@@ -275,7 +275,7 @@ export default function WelcomeFlow({
                         )}
                         <p className="text-[11.5px] text-[var(--text-secondary)] mt-2">
                             {episode === 0
-                                ? "Nothing marked yet — it'll go to Plan to watch"
+                                ? "Nothing marked yet — it'll go to Someday"
                                 : total && episode >= total
                                   ? "All episodes marked watched — finished!"
                                   : `Episodes 1–${episode} marked watched`}
@@ -283,7 +283,7 @@ export default function WelcomeFlow({
                     </div>
                     <div className="tdx-callout tdx-callout-quiet items-center mt-3">
                         <Info size={15} aria-hidden />
-                        Haven&apos;t started it? Set 0 and it goes to Plan to watch.
+                        Haven&apos;t started it? Set 0 and it goes to Someday.
                     </div>
                     {error && <div className="tdx-callout tdx-callout-warn mt-3">{error}</div>}
                     <div className="mt-auto pt-5">

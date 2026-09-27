@@ -34,9 +34,13 @@ The historical seed references production IDs and is not suitable for a fresh lo
 4. Deploy the web application **after** its database migrations. It requires the new columns/functions; do not deploy it against the old schema. No new production environment variables are needed.
 5. Check library filtering, movie notes, contributions, review, rating eligibility and public rankings. Monitor `catalog_publication_failed` and `rating_failed` log events; their payloads contain codes, not notes/payment evidence. Query the pending queue and unresolved reports from the admin page.
 
-Trust is managed at `/admin`. Supporter trust requires a manually verified paid-through expiry. Expired/revoked trust affects new publications only. No payment evidence, billing integration or Patreon API access is stored. Contributors can find their member ID in `/community`.
+Trust is managed at `/admin`. Supporter trust requires a manually verified paid-through expiry. Expired/revoked trust affects new publications only. No payment evidence, billing integration or Patreon API access is stored. Contributors can find their member ID in `/community/submissions`.
 
 For rollback, revert the application and retain additive data; do not drop tables holding contributions/ratings. Catalog mistakes can be restored as a new revision from `/admin?id=<title-id>`. Hidden titles retain tracking history but disappear from public browsing/rankings.
+
+## Profiles and the activity feed
+
+`20260919000000_profiles_activity.sql` adds `profiles` (public handle, `share_activity`), `notification_prefs` (weekly recap switch), and `activity` — what people log, written only by security-definer triggers on `user_series_progress` and `catalog_submissions`, readable for 90 days, never notes or ratings. A member with no profile row or `share_activity = false` never appears. `ensureProfile()` (`lib/profiles.ts`) creates a handle on sign-in/sign-up; members change it from Account. `catalog_credits()` names who first added a title (published submission author), `catalog_nearly_ranked()` lists titles with 1–4 votes, and `catalog_page` gains `sentai` / `rider` / `ultra` / `needs_work` filters plus `episode_count`.
 
 ## Local checks
 

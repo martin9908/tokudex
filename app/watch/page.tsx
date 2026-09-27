@@ -3,13 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
-import { ArrowLeft, CheckCircle } from "@phosphor-icons/react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import { saveEpisodeCheckIn } from "../actions";
-import { NOTE_MAX_LENGTH } from "@/lib/validation";
-import { buttonClasses } from "../components/atoms";
-import StatusChoice, {
-    type ProgressStatus,
-} from "../components/molecules/StatusChoice";
+import type { ProgressStatus } from "@/lib/validation";
+import CheckInForm from "../components/organisms/CheckInForm";
 
 type Series = {
     id: string;
@@ -21,6 +18,7 @@ type Episode = {
     episode_number: number;
     title: string;
     synopsis: string | null;
+    episode_type?: string | null;
 };
 
 type Progress = { status: ProgressStatus } | null;
@@ -109,9 +107,8 @@ function WatchPageContent() {
             await saveEpisodeCheckIn(seriesId, episodeNumber, status, note);
 
             if (mode === "next" && hasNext) {
-                router.push(
-                    `/watch?series=${seriesId}&episode=${episodeNumber + 1}`,
-                );
+                await saveEpisodeCheckIn(seriesId, episodeNumber + 1, status, "");
+                router.push(`/series/${seriesId}`);
             } else {
                 router.push(`/series/${seriesId}`);
             }
@@ -143,109 +140,30 @@ function WatchPageContent() {
     }
 
     return (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 w-full">
+        <div className="max-w-[640px] mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 w-full">
             <Link
                 href={`/series/${seriesId}`}
                 className="tdx-focus-ring inline-flex items-center gap-2.5 text-[12.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded"
             >
                 <ArrowLeft size={16} aria-hidden />
-                {series.title}
+                Back to {series.title}
             </Link>
-            <div className="flex items-baseline gap-2.5 mt-3">
-                <h1 className="text-[26px] font-medium tracking-[-0.02em]">
-                    Episode {episodeNumber}
-                </h1>
-                {total && (
-                    <span className="text-[12.5px] text-[var(--text-muted)]">
-                        of {total}
-                    </span>
-                )}
-            </div>
-            {episode?.title && (
-                <p className="text-sm text-[var(--accent-text)] mt-1.5">
-                    {episode.title}
-                </p>
-            )}
-            {episode?.synopsis && (
-                <p className="mt-2.5 text-[12.5px] leading-[1.55] text-[var(--text-secondary)] max-w-[520px]">
-                    {episode.synopsis}
-                </p>
-            )}
-
-            {error && (
-                <div className="tdx-callout tdx-callout-warn mt-4">{error}</div>
-            )}
-
-            <section className="tdx-panel mt-5 p-4">
-                <p className="tdx-eyebrow">Series status</p>
-                <div className="mt-2.5">
-                    <StatusChoice
-                        value={status}
-                        onChange={setStatus}
-                        disabled={saving !== null}
-                    />
-                </div>
-            </section>
-
-            <section className="tdx-panel mt-3.5 p-4">
-                <div className="flex items-baseline gap-2">
-                    <label htmlFor="recap-note" className="tdx-eyebrow">
-                        Episode note
-                    </label>
-                    <span className="text-[11px] text-[var(--text-muted)]">
-                        private, optional
-                    </span>
-                </div>
-                <textarea
-                    id="recap-note"
-                    rows={4}
-                    value={note}
-                    maxLength={NOTE_MAX_LENGTH}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="What happened? A line or two is plenty."
-                    className="tdx-field tdx-field-sunk mt-2 min-h-[84px] text-[13px] leading-[1.5]"
+            <div className="mt-5 rounded-lg border border-[var(--line)] px-[22px] sm:px-[28px] pt-[22px] pb-[26px]">
+                <CheckInForm
+                    seriesTitle={series.title}
+                    episodeNumber={episodeNumber}
+                    totalEpisodes={total}
+                    episodeTitle={episode?.title}
+                    episodeSynopsis={episode?.synopsis}
+                    episodeType={episode?.episode_type}
+                    note={note}
+                    onNoteChange={setNote}
+                    status={status}
+                    onStatusChange={setStatus}
+                    saving={saving !== null}
+                    error={error}
+                    onSave={(alsoNext) => handleSave(alsoNext ? "next" : "save")}
                 />
-                <div className="flex justify-between mt-1.5 text-[11px] text-[var(--text-muted)]">
-                    <span>Only you can see this</span>
-                    <span>
-                        {note.length}/{NOTE_MAX_LENGTH}
-                    </span>
-                </div>
-            </section>
-
-            <div className="flex items-center gap-2.5 mt-[18px] flex-wrap">
-                <button
-                    type="button"
-                    onClick={() => handleSave("save")}
-                    disabled={saving !== null}
-                    aria-busy={saving === "save"}
-                    className={buttonClasses()}
-                >
-                    <CheckCircle size={15} weight="fill" aria-hidden />
-                    {saving === "save" ? "Saving…" : "Save check-in"}
-                </button>
-                {hasNext && (
-                    <button
-                        type="button"
-                        onClick={() => handleSave("next")}
-                        disabled={saving !== null}
-                        aria-busy={saving === "next"}
-                        className={buttonClasses({ variant: "secondary" })}
-                    >
-                        {saving === "next"
-                            ? "Saving…"
-                            : `Save and log ${episodeNumber + 1}`}
-                    </button>
-                )}
-                <Link
-                    href={`/series/${seriesId}`}
-                    className={buttonClasses({
-                        variant: "ghost",
-                        className: "ml-auto",
-                    })}
-                >
-                    Cancel
-                </Link>
             </div>
             <p className="mt-3 text-[11.5px] text-[var(--text-muted)] leading-[1.5]">
                 Movies have no check-in screen — they go straight to watched on

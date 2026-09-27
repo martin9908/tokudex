@@ -3,73 +3,46 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-    House,
+    TelevisionSimple,
     SquaresFour,
-    Ranking,
+    Trophy,
     UsersThree,
-    User,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
+import { PRIMARY_NAV } from "../molecules/NavLinks";
 
-const TABS: {
-    href: string;
-    label: string;
-    Icon: PhosphorIcon;
-    match: (p: string) => boolean;
-}[] = [
-    { href: "/", label: "Home", Icon: House, match: (p) => p === "/" },
-    {
-        href: "/series",
-        label: "Library",
-        Icon: SquaresFour,
-        match: (p) => p.startsWith("/series"),
-    },
-    {
-        href: "/rankings",
-        label: "Ranks",
-        Icon: Ranking,
-        match: (p) => p.startsWith("/rankings"),
-    },
-    {
-        href: "/community",
-        label: "Community",
-        Icon: UsersThree,
-        match: (p) => p.startsWith("/community"),
-    },
-    {
-        href: "/account",
-        label: "You",
-        Icon: User,
-        match: (p) =>
-            p.startsWith("/account") ||
-            p.startsWith("/achievements") ||
-            p.startsWith("/invite") ||
-            p.startsWith("/notifications"),
-    },
-];
+const ICONS: Record<string, PhosphorIcon> = {
+    "/": TelevisionSimple,
+    "/series": SquaresFour,
+    "/achievements": Trophy,
+    "/community": UsersThree,
+};
 
+/** Four tabs on phones — Watching, Dex, Awards, Community. Account lives behind the avatar. */
 export default function MobileTabBar() {
     const pathname = usePathname();
 
     return (
-        <nav className="ios-safe-bottom fixed bottom-0 inset-x-0 z-20 border-t border-[var(--line)] bg-[var(--surface)] md:hidden">
-            <ul className="mx-auto max-w-3xl grid grid-cols-5 px-1">
-                {TABS.map((tab) => {
+        <nav className="ios-safe-bottom fixed bottom-0 inset-x-0 z-20 border-t border-[var(--line)] bg-[var(--background)] md:hidden">
+            <ul className="mx-auto max-w-3xl grid grid-cols-4 px-1">
+                {PRIMARY_NAV.map((tab) => {
                     const active = tab.match(pathname);
+                    const Icon = ICONS[tab.href];
                     return (
                         <li key={tab.href}>
                             <Link
                                 href={tab.href}
                                 aria-current={active ? "page" : undefined}
-                                className={`tdx-focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors ${
+                                className={`tdx-focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 py-2 text-[10.5px] transition-colors ${
                                     active
-                                        ? "text-[var(--accent-primary)]"
+                                        ? "text-[var(--text-primary)]"
                                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 }`}
                             >
-                                <tab.Icon
-                                    size={17}
+                                <Icon
+                                    size={20}
                                     weight={active ? "fill" : "regular"}
+                                    className={active ? "text-[var(--accent-primary)]" : ""}
                                 />
                                 {tab.label}
                             </Link>

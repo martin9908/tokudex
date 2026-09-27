@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { getCatalogPage } from "@/lib/catalogQueries";
-import { RankingsTable } from "../series/SeriesLibrary";
+import { getCatalogPage, getNearlyRanked } from "@/lib/catalogQueries";
+import type { CatalogFilter } from "@/lib/catalog";
+import RankingsTable from "./RankingsTable";
 export const metadata: Metadata = {
     title: "Community Rankings",
     description: "Discover top-rated tokusatsu, anime, and movies.",
@@ -11,6 +12,18 @@ export default async function Rankings({
 }: {
     searchParams: Promise<{ q?: string; filter?: string; page?: string }>;
 }) {
-    const catalog = await getCatalogPage(await searchParams, true);
-    return <RankingsTable series={catalog.items} {...catalog} />;
+    const params = await searchParams;
+    const [catalog, nearly] = await Promise.all([
+        getCatalogPage(params, true),
+        getNearlyRanked(),
+    ]);
+    const showNearly = !params.q && catalog.page === 1;
+    return (
+        <RankingsTable
+            series={catalog.items}
+            {...catalog}
+            filter={catalog.filter as CatalogFilter}
+            nearly={showNearly ? nearly : []}
+        />
+    );
 }

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle } from "@phosphor-icons/react";
+import { CheckCircle, Circle } from "@phosphor-icons/react";
 import EpisodeCheckInModal from "./EpisodeCheckInModal";
-import { setEpisodeProgress } from "../../actions";
-import { buttonClasses } from "../atoms";
-import { relativeTime } from "@/lib/progress";
+import { saveNote, setEpisodeProgress } from "../../actions";
+import { BigNumber, HairlineRule, TagChip, buttonClasses } from "../atoms";
+import type { ProgressStatus } from "@/lib/validation";
+import { NOTE_MAX_LENGTH } from "@/lib/validation";
 import { episodeTypeLabel, isSkippableEpisodeType } from "@/lib/episodeTypes";
 
 type Episode = {
@@ -23,72 +24,147 @@ type EpisodeListProps = {
     seriesTitle: string;
     totalEpisodes: number;
     currentEpisode: number;
+    status?: ProgressStatus;
     episodes: Episode[];
     guest?: boolean;
     notes?: Record<number, string>;
-    /** ISO timestamp of the last check-in, shown on the current episode row. */
-    lastWatchedAt?: string | null;
+    /** Tokusatsu episodes logged so far, for the sheet's rank counter. */
+    episodesLogged?: number | null;
 };
 
-type Filter = "all" | "unwatched" | "recaps";
+type Filter = "all" | "arc" | "unwatched";
 
-/** Rows shown around the current episode before "show all" is pressed. */
+/** Rows shown around the current episode before the list is expanded. */
 const BEFORE = 2;
 const AFTER = 6;
 
-function formatAirDate(iso: string | null | undefined): string | null {
-    if (!iso) return null;
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toLocaleDateString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    });
+const WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+function countWord(n: number) {
+    return n < WORDS.length ? WORDS[n] : String(n);
+}
+
+function CollapsedRun({
+    list,
+    currentEpisode,
+    notes,
+    onExpand,
+}: {
+    list: number[];
+    currentEpisode: number;
+    notes: Record<number, string>;
+    onExpand: () => void;
+}) {
+    if (!list.length) return null;
+    const logged = list.filter((n) => n <= currentEpisode).length;
+    const range =
+        list.length === 1 ? `${list[0]}` : `${list[0]}–${list[list.length - 1]}`;
+    const noted = list.filter((n) => notes[n]?.trim()).length;
+    return (
+        <button
+            type="button"
+            onClick={onExpand}
+            className="tdx-focus-ring grid grid-cols-[62px_1fr_auto] items-center gap-[18px] w-full text-left px-[18px] md:px-[30px] py-[9px] text-[11.5px] text-[var(--text-secondary)] hover:bg-[var(--sunk)] rounded"
+        >
+            <span className="tabular-nums">{range}</span>
+            <span>
+                {logged === list.length
+                    ? `${countWord(logged)} logged${noted ? `, ${noted} with notes` : ", nothing worth flagging"}`
+                    : logged === 0
+                      ? `${countWord(list.length)} more`
+                      : `${logged} logged, ${list.length - logged} to go`}
+            </span>
+            <span className="text-[var(--accent-primary)]">Show</span>
+        </button>
+    );
 }
 
 /**
- * Episode list in broadcast order. Watched rows carry your recap inline, the
- * next episode is highlighted with its own actions, and everything past the
- * window collapses behind "show all" so a 50-episode run stays scannable.
+ * Episode list in broadcast order, one hairline row per episode. Logged rows
+ * dim, the next episode sits on a sunk band, runs of logged episodes outside
+ * the window collapse to a one-line summary, and untitled episodes point at
+ * the catalog so someone can fix them.
  */
 export default function EpisodeList({
     seriesId,
     seriesTitle,
     totalEpisodes,
     currentEpisode,
+    status = "watching",
     episodes,
     guest = false,
     notes = {},
-    lastWatchedAt = null,
+    episodesLogged,
 }: EpisodeListProps) {
     const router = useRouter();
     const [openEpisode, setOpenEpisode] = useState<number | null>(null);
-    const [pending, setPending] = useState<number | null>(null);
     const [filter, setFilter] = useState<Filter>("all");
-    const [hideSkippable, setHideSkippable] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [pending, setPending] = useState<number | null>(null);
+    const [editing, setEditing] = useState<number | null>(null);
+    const [draft, setDraft] = useState("");
     const [, startTransition] = useTransition();
     const nextRef = useRef<HTMLDivElement>(null);
 
+    const byNumber = useMemo(() => {
+        const map = new Map<number, Episode>();
+        for (const entry of episodes) map.set(entry.episode_number, entry);
+        return map;
+    }, [episodes]);
+
+    const skippable = useMemo(() => {
+        const set = new Set<number>();
+        for (const [number, entry] of byNumber)
+            if (number <= totalEpisodes && isSkippableEpisodeType(entry.episode_type))
+                set.add(number);
+        return set;
+    }, [byNumber, totalEpisodes]);
+
+    const gaps = useMemo(() => {
+        const list: number[] = [];
+        for (let n = 1; n <= totalEpisodes; n++)
+            if (!byNumber.get(n)?.title?.trim()) list.push(n);
+        return list;
+    }, [byNumber, totalEpisodes]);
+
+    const next = currentEpisode + 1;
+
+    const matching = useMemo(() => {
+        const all = Array.from({ length: totalEpisodes }, (_, i) => i + 1);
+        return all.filter((n) => {
+            if (filter === "arc") return !skippable.has(n);
+            if (filter === "unwatched") return n > currentEpisode;
+            return true;
+        });
+    }, [totalEpisodes, filter, skippable, currentEpisode]);
+
+    const lo = Math.max(1, currentEpisode - BEFORE);
+    const hi = Math.min(totalEpisodes, next + AFTER);
+    const windowed = useMemo(
+        () =>
+            expanded || filter === "unwatched"
+                ? matching
+                : matching.filter((n) => n >= lo && n <= hi),
+        [expanded, filter, matching, lo, hi],
+    );
+    const before = windowed.length ? matching.filter((n) => n < windowed[0]) : [];
+    const after = windowed.length
+        ? matching.filter((n) => n > windowed[windowed.length - 1])
+        : matching;
+
     function scrollToNext() {
         setExpanded(true);
-        // Let the expanded rows render before scrolling.
         requestAnimationFrame(() =>
-            nextRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-            }),
+            nextRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
         );
     }
 
-    function setProgress(target: number, episodeNumber: number) {
-        setPending(episodeNumber);
+    function unmark(n: number) {
+        setPending(n);
         setError(null);
         startTransition(async () => {
             try {
-                await setEpisodeProgress(seriesId, target);
+                await setEpisodeProgress(seriesId, n - 1);
                 router.refresh();
             } catch {
                 setError("That didn't save. Check your connection and try again.");
@@ -98,118 +174,87 @@ export default function EpisodeList({
         });
     }
 
-    const byNumber = useMemo(() => {
-        const map = new Map<number, Episode>();
-        for (const entry of episodes) map.set(entry.episode_number, entry);
-        return map;
-    }, [episodes]);
-
-    // Episode numbers the "hide filler" toggle can remove — filler, clip shows
-    // and recaps. Specials/crossovers stay visible; they're tagged for context.
-    const skippableNumbers = useMemo(() => {
-        const set = new Set<number>();
-        for (const [number, entry] of byNumber) {
-            if (number <= totalEpisodes && isSkippableEpisodeType(entry.episode_type))
-                set.add(number);
-        }
-        return set;
-    }, [byNumber, totalEpisodes]);
-
-    const noteCount = useMemo(
-        () =>
-            Object.keys(notes).filter(
-                (n) => Number(n) <= totalEpisodes && notes[Number(n)]?.trim(),
-            ).length,
-        [notes, totalEpisodes],
-    );
-
-    const next = currentEpisode + 1;
-
-    const matching = useMemo(() => {
-        const all = Array.from({ length: totalEpisodes }, (_, i) => i + 1);
-        return all.filter((n) => {
-            if (hideSkippable && skippableNumbers.has(n)) return false;
-            if (filter === "unwatched") return n > currentEpisode;
-            if (filter === "recaps") return Boolean(notes[n]?.trim());
-            return true;
+    function commitNote(n: number) {
+        setPending(n);
+        setError(null);
+        startTransition(async () => {
+            try {
+                await saveNote(seriesId, n, draft.trim());
+                setEditing(null);
+                router.refresh();
+            } catch {
+                setError("That note didn't save. Try again.");
+            } finally {
+                setPending(null);
+            }
         });
-    }, [totalEpisodes, hideSkippable, skippableNumbers, filter, currentEpisode, notes]);
-
-    // The collapsed window: a couple of watched rows for context, the next
-    // episode, and a handful after it. Filters always show every match.
-    const windowed = useMemo(() => {
-        if (expanded || filter !== "all") return matching;
-        const lo = Math.max(1, currentEpisode - BEFORE);
-        const hi = Math.min(totalEpisodes, next + AFTER);
-        return matching.filter((n) => n >= lo && n <= hi);
-    }, [expanded, filter, matching, currentEpisode, next, totalEpisodes]);
-
-    const hiddenBefore = windowed.length
-        ? matching.filter((n) => n < windowed[0]).length
-        : 0;
-    const hiddenAfter = windowed.length
-        ? matching.filter((n) => n > windowed[windowed.length - 1]).length
-        : matching.length;
+    }
 
     const filters: { key: Filter; label: string }[] = [
         { key: "all", label: `All ${totalEpisodes}` },
+        ...(skippable.size ? [{ key: "arc" as Filter, label: "Arc only" }] : []),
         { key: "unwatched", label: "Unwatched" },
-        { key: "recaps", label: "With recaps" },
     ];
+
+    const summary = (
+        <span className="ml-auto text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+            {guest ? (
+                `${totalEpisodes} episodes`
+            ) : (
+                <>
+                    <span className="hidden sm:inline">{currentEpisode} logged</span>
+                    {gaps.length > 0 && (
+                        <>
+                            <span className="hidden sm:inline"> · </span>
+                            {gaps.length} gap{gaps.length === 1 ? "" : "s"}
+                        </>
+                    )}
+                </>
+            )}
+        </span>
+    );
 
     return (
         <div>
-            <div className="flex items-center gap-3 mb-3.5 flex-wrap">
-                <h2 className="text-[17px] font-medium">Episodes</h2>
-                <span className="text-[11.5px] text-[var(--text-muted)]">
-                    broadcast order
-                </span>
-                <div className="ml-auto flex items-center gap-2.5 flex-wrap">
-                    {!guest && (
-                        <div className="tdx-seg tdx-seg-sm" role="group" aria-label="Filter episodes">
-                            {filters.map((f) => (
-                                <button
-                                    key={f.key}
-                                    type="button"
-                                    aria-pressed={filter === f.key}
-                                    onClick={() => setFilter(f.key)}
-                                    className="tdx-focus-ring"
-                                >
-                                    {f.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                    {skippableNumbers.size > 0 && (
-                        <label className="tdx-switch">
-                            <input
-                                type="checkbox"
-                                checked={hideSkippable}
-                                onChange={(e) => setHideSkippable(e.target.checked)}
-                                className="sr-only"
-                            />
-                            <span className="tdx-switch-knob" aria-hidden />
-                            Hide filler ({skippableNumbers.size})
-                        </label>
-                    )}
-                    {!guest && currentEpisode < totalEpisodes && (
-                        <button
-                            type="button"
-                            onClick={scrollToNext}
-                            className={buttonClasses({ variant: "secondary", size: "sm" })}
-                        >
-                            Jump to {next}
-                        </button>
-                    )}
-                </div>
+            <div className="flex items-center gap-2.5 md:gap-[18px] px-[18px] md:px-[30px] py-[14px] md:py-4 text-[12px] md:text-[12.5px] flex-wrap">
+                {filters.map((f) => (
+                    <button
+                        key={f.key}
+                        type="button"
+                        aria-pressed={filter === f.key}
+                        onClick={() => setFilter(f.key)}
+                        className={`tdx-focus-ring px-[11px] md:px-3 py-[6px] rounded-[7px] border transition-colors ${
+                            filter === f.key
+                                ? "border-[var(--accent-primary)] text-[var(--accent-primary)]"
+                                : "border-[var(--line)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                    >
+                        {f.label}
+                    </button>
+                ))}
+                {summary}
+                {!guest && currentEpisode < totalEpisodes && !expanded && (
+                    <button
+                        type="button"
+                        onClick={scrollToNext}
+                        className="tdx-focus-ring hidden md:inline text-[12px] text-[var(--accent-primary)] rounded"
+                    >
+                        Jump to {next}
+                    </button>
+                )}
             </div>
+            <HairlineRule />
 
-            {error && <div className="tdx-callout tdx-callout-warn mb-3">{error}</div>}
+            {error && (
+                <div className="tdx-callout tdx-callout-warn mx-[18px] md:mx-[30px] my-3">
+                    {error}
+                </div>
+            )}
 
             {guest && (
-                <div className="tdx-callout mb-3 items-center">
+                <div className="tdx-callout mx-[18px] md:mx-[30px] my-3 items-center">
                     <span className="flex-1">
-                        Sign in to log episodes and keep recaps of what happened.
+                        Sign in to log episodes and keep notes on what happened.
                     </span>
                     <Link href="/login" className={buttonClasses({ size: "sm" })}>
                         Sign in
@@ -217,199 +262,184 @@ export default function EpisodeList({
                 </div>
             )}
 
-            {hiddenBefore > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setExpanded(true)}
-                    className="tdx-focus-ring block px-3 pb-3 text-xs text-[var(--text-secondary)] rounded"
-                >
-                    {hiddenBefore} earlier episode{hiddenBefore === 1 ? "" : "s"} ·{" "}
-                    <span className="text-[var(--accent-primary)]">show all</span>
-                </button>
-            )}
+            <CollapsedRun
+                list={before}
+                currentEpisode={currentEpisode}
+                notes={notes}
+                onExpand={() => setExpanded(true)}
+            />
 
             <div className="flex flex-col">
                 {windowed.map((n) => {
                     const entry = byNumber.get(n);
-                    const title = entry?.title ?? null;
+                    const title = entry?.title?.trim() || null;
                     const typeLabel = episodeTypeLabel(entry?.episode_type);
                     const note = notes[n]?.trim();
-                    const watched = n <= currentEpisode;
-                    const isCurrent = n === currentEpisode;
-                    const isNext = n === next && !guest;
-                    const isPending = pending === n;
+                    const logged = !guest && n <= currentEpisode;
+                    const isCurrent = !guest && n === currentEpisode;
+                    const isNext = !guest && n === next;
+                    const tone = isNext ? "accent" : logged ? "dim" : "mute";
+                    const isEditing = editing === n;
+                    const busy = pending === n;
 
-                    if (isNext) {
-                        const aired = formatAirDate(entry?.air_date);
-                        return (
-                            <div
-                                key={n}
-                                ref={nextRef}
-                                className="grid grid-cols-[52px_1fr] sm:grid-cols-[52px_1fr_auto] items-center gap-x-3.5 gap-y-2.5 px-3 py-3.5 my-1.5 rounded-md bg-[var(--accent-tint)] border border-[var(--accent-primary)]"
+                    const rowBody = (
+                        <>
+                            <BigNumber
+                                size={30}
+                                tone={tone}
+                                className="hidden md:inline"
                             >
-                                <span className="text-xs text-[var(--accent-on)] tabular-nums">
-                                    {n}
-                                </span>
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[15px] font-medium text-[var(--accent-on)]">
-                                            {title ?? `Episode ${n}`}
-                                        </span>
-                                        <span className="tdx-chip text-[9.5px] py-0.5 border-[var(--accent-primary)] text-[var(--accent-on)]">
-                                            Up next
-                                        </span>
-                                        {typeLabel && (
-                                            <span className="tdx-chip text-[9.5px] py-0.5 border-[var(--accent-primary)] text-[var(--accent-on)]">
-                                                {typeLabel}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {aired && (
-                                        <p className="text-[11.5px] text-[var(--accent-on)] opacity-75 mt-0.5">
-                                            Aired {aired}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex gap-2 col-start-2 sm:col-start-auto">
-                                    <button
-                                        type="button"
-                                        onClick={() => setProgress(n, n)}
-                                        disabled={isPending}
-                                        className={buttonClasses({
-                                            variant: "secondary",
-                                            size: "sm",
-                                        })}
-                                    >
-                                        {isPending ? "Saving…" : "Mark watched"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOpenEpisode(n)}
-                                        className={buttonClasses({
-                                            size: "sm",
-                                            className: "bg-[var(--surface)]",
-                                        })}
-                                    >
-                                        Log with recap
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    }
-
-                    const status = guest
-                        ? (formatAirDate(entry?.air_date) ?? "")
-                        : watched
-                          ? isCurrent && lastWatchedAt
-                              ? relativeTime(lastWatchedAt)
-                              : "Watched"
-                          : "Not logged";
-
-                    const row = (
-                        <div className="grid grid-cols-[52px_1fr_auto] items-center gap-3.5">
-                            <span className="text-xs text-[var(--text-muted)] tabular-nums">
+                                {n}
+                            </BigNumber>
+                            <span
+                                className={`md:hidden text-[17px] font-medium w-[30px] tabular-nums ${
+                                    isNext
+                                        ? "text-[var(--text-primary)]"
+                                        : "text-[var(--text-muted)]"
+                                }`}
+                            >
                                 {n}
                             </span>
-                            <div className="flex items-center gap-2 min-w-0">
-                                {watched && (
-                                    <CheckCircle
-                                        size={13}
-                                        weight="fill"
-                                        className="flex-none text-[var(--accent-primary)]"
-                                        aria-label="Watched"
-                                    />
-                                )}
-                                <span
-                                    className={`text-[13.5px] truncate ${
-                                        watched && !isCurrent
+                            <div className="min-w-0">
+                                <div
+                                    className={`text-[13px] md:text-[13.5px] ${
+                                        logged && !isNext
                                             ? "text-[var(--text-secondary)]"
-                                            : "text-[var(--text-primary)]"
+                                            : title
+                                              ? "text-[var(--text-primary)]"
+                                              : "text-[var(--text-secondary)]"
                                     }`}
                                 >
-                                    {title ?? `Episode ${n}`}
-                                </span>
-                                {typeLabel && (
-                                    <span className="tdx-chip text-[9.5px] py-0.5 text-[var(--text-muted)]">
-                                        {typeLabel}
-                                    </span>
+                                    {title ??
+                                        (guest ? `Episode ${n}` : "Untitled in the catalog")}
+                                </div>
+                                {isNext && (
+                                    <div className="md:hidden text-[11px] text-[var(--accent-primary)] mt-[3px]">
+                                        Up next
+                                    </div>
+                                )}
+                                {!title && !guest && (
+                                    <div className="md:hidden text-[11px] text-[var(--accent-primary)] mt-[3px]">
+                                        Add one
+                                    </div>
+                                )}
+                                {(typeLabel || !title || isNext) && (
+                                    <div className="hidden md:flex gap-1.5 mt-[7px] flex-wrap">
+                                        {isNext && !typeLabel && <TagChip accent>Arc</TagChip>}
+                                        {typeLabel && (
+                                            <TagChip accent={isNext}>{typeLabel}</TagChip>
+                                        )}
+                                        {!title && <TagChip>Missing title</TagChip>}
+                                    </div>
                                 )}
                             </div>
-                            <span className="text-[11.5px] text-[var(--text-muted)] whitespace-nowrap">
-                                {isPending ? "Saving…" : status}
+                            <span
+                                className={`hidden md:inline text-[11.5px] whitespace-nowrap ${
+                                    isNext
+                                        ? "text-[var(--accent-primary)]"
+                                        : "text-[var(--text-secondary)]"
+                                }`}
+                            >
+                                {busy ? "Saving…" : isNext ? "Up next" : logged ? "Logged" : ""}
                             </span>
-                        </div>
+                            <span className="md:hidden">
+                                {logged ? (
+                                    <CheckCircle
+                                        size={19}
+                                        weight="fill"
+                                        className="text-[var(--accent-primary)]"
+                                        aria-label="Logged"
+                                    />
+                                ) : guest ? null : (
+                                    <Circle
+                                        size={19}
+                                        className="text-[var(--text-secondary)]"
+                                        aria-hidden
+                                    />
+                                )}
+                            </span>
+                        </>
                     );
 
+                    const rowClass = `grid grid-cols-[30px_1fr_auto] md:grid-cols-[62px_1fr_auto] items-center gap-[13px] md:gap-[18px] px-[18px] md:px-[30px] py-[11px] md:py-[13px] min-h-[48px] w-full text-left ${
+                        isNext
+                            ? "bg-[var(--sunk)] border-y border-[var(--line)] md:border-0"
+                            : "tdx-row rounded-none"
+                    }`;
+
                     return (
-                        <div
-                            key={n}
-                            className={`rounded-md px-3 py-[11px] ${
-                                note ? "bg-[var(--sunk)]" : "tdx-row"
-                            }`}
-                        >
+                        <div key={n} ref={isNext ? nextRef : undefined}>
                             {guest ? (
-                                row
+                                <div className={rowClass}>{rowBody}</div>
                             ) : (
                                 <button
                                     type="button"
-                                    onClick={() => setOpenEpisode(n)}
-                                    aria-label={`${watched ? "Edit recap for" : "Log"} episode ${n}`}
-                                    className="tdx-focus-ring block w-full text-left rounded"
+                                    onClick={() => {
+                                        if (logged) {
+                                            setEditing(isEditing ? null : n);
+                                            setDraft(note ?? "");
+                                        } else setOpenEpisode(n);
+                                    }}
+                                    aria-label={
+                                        logged
+                                            ? `Episode ${n} — note`
+                                            : `Log episode ${n}`
+                                    }
+                                    className={`tdx-focus-ring ${rowClass}`}
                                 >
-                                    {row}
+                                    {rowBody}
                                 </button>
                             )}
-                            {note && (
-                                <div className="tdx-note mt-2 sm:ml-[66px] bg-[var(--surface)]">
-                                    <p className="tdx-eyebrow text-[var(--accent-text)] mb-1">
-                                        Your recap
-                                    </p>
-                                    <p className="text-[12.5px] leading-[1.5] whitespace-pre-wrap">
-                                        {note}
-                                    </p>
-                                    <div className="mt-1.5 flex gap-3.5 text-[11px]">
-                                        {!guest && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setOpenEpisode(n)}
-                                                className="tdx-focus-ring text-[var(--accent-primary)] rounded"
-                                            >
-                                                Edit
-                                            </button>
-                                        )}
-                                        <span className="text-[var(--text-muted)]">
-                                            {note.length} characters
-                                        </span>
-                                        {!guest && isCurrent && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setProgress(n - 1, n)}
-                                                disabled={isPending}
-                                                className="tdx-focus-ring ml-auto text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded"
-                                            >
-                                                Unmark
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            {!note && !guest && isCurrent && (
-                                <div className="mt-1 sm:ml-[66px] flex gap-3.5 text-[11px]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setOpenEpisode(n)}
-                                        className="tdx-focus-ring text-[var(--accent-primary)] rounded"
-                                    >
-                                        Add a recap
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setProgress(n - 1, n)}
-                                        disabled={isPending}
-                                        className="tdx-focus-ring text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded"
-                                    >
-                                        Unmark
-                                    </button>
+                            {logged && (note || isEditing) && (
+                                <div className="px-[18px] md:px-[30px] pb-3 md:pl-[110px]">
+                                    {isEditing ? (
+                                        <div>
+                                            <textarea
+                                                autoFocus
+                                                rows={3}
+                                                value={draft}
+                                                maxLength={NOTE_MAX_LENGTH}
+                                                onChange={(e) => setDraft(e.target.value)}
+                                                className="tdx-field text-[13.5px] leading-[1.6]"
+                                                style={{ fontFamily: "ui-serif, Georgia, serif" }}
+                                                placeholder="Note to self — just you"
+                                            />
+                                            <div className="flex gap-3 mt-2 text-[11.5px] items-center">
+                                                <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    onClick={() => commitNote(n)}
+                                                    className={buttonClasses({ size: "sm" })}
+                                                >
+                                                    {busy ? "Saving…" : "Save note"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditing(null)}
+                                                    className={buttonClasses({ variant: "ghost", size: "sm" })}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                {isCurrent && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={busy}
+                                                        onClick={() => unmark(n)}
+                                                        className="tdx-focus-ring ml-auto text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded"
+                                                    >
+                                                        Unmark {n}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p
+                                            className="text-[13px] leading-[1.6] text-[var(--text-secondary)] whitespace-pre-wrap"
+                                            style={{ fontFamily: "ui-serif, Georgia, serif" }}
+                                        >
+                                            {note}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -418,58 +448,66 @@ export default function EpisodeList({
             </div>
 
             {windowed.length === 0 && (
-                <p className="px-3 py-4 text-sm text-[var(--text-secondary)]">
-                    {filter === "recaps"
-                        ? "No recaps yet — log an episode with a note and it shows up here."
-                        : filter === "unwatched"
-                          ? "Nothing left to watch. Every episode is logged."
-                          : "No episodes match."}
+                <p className="px-[18px] md:px-[30px] py-4 text-sm text-[var(--text-secondary)]">
+                    {filter === "unwatched"
+                        ? "Nothing left to watch. Every episode is logged."
+                        : "No episodes match."}
                 </p>
             )}
 
-            {hiddenAfter > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setExpanded(true)}
-                    className="tdx-focus-ring block px-3 pt-3.5 text-xs text-[var(--text-secondary)] rounded"
-                >
-                    {hiddenAfter} more episode{hiddenAfter === 1 ? "" : "s"} ·{" "}
-                    <span className="text-[var(--accent-primary)]">show all</span>
-                </button>
-            )}
-            {expanded && filter === "all" && matching.length > BEFORE + AFTER + 1 && (
-                <button
-                    type="button"
-                    onClick={() => setExpanded(false)}
-                    className="tdx-focus-ring block px-3 pt-3.5 text-xs text-[var(--text-secondary)] rounded"
-                >
-                    <span className="text-[var(--accent-primary)]">Collapse</span> to
-                    around episode {Math.min(next, totalEpisodes)}
-                </button>
-            )}
+            <CollapsedRun
+                list={after}
+                currentEpisode={currentEpisode}
+                notes={notes}
+                onExpand={() => setExpanded(true)}
+            />
 
-            {hideSkippable && skippableNumbers.size > 0 && (
-                <p className="mt-3 px-3 text-xs text-[var(--text-muted)]">
-                    {skippableNumbers.size} filler / clip show
-                    {skippableNumbers.size === 1 ? "" : "s"} hidden — numbering
-                    still follows the broadcast order and your count is unchanged.
-                </p>
-            )}
-            {noteCount > 0 && filter !== "recaps" && (
-                <p className="sr-only">{noteCount} episodes have recaps.</p>
-            )}
+            <div className="px-[18px] md:px-[30px] pt-[15px] pb-[24px] text-[12px] text-[var(--text-secondary)] flex flex-wrap gap-x-4 gap-y-1.5">
+                {gaps.length > 0 && (
+                    <span>
+                        Ep {gaps.slice(0, 3).join(", ")}
+                        {gaps.length > 3 ? ` and ${gaps.length - 3} more` : ""}{" "}
+                        {gaps.length === 1 ? "has" : "have"} no title on record —{" "}
+                        <Link
+                            href={`/community/new?id=${seriesId}`}
+                            className="text-[var(--accent-primary)]"
+                        >
+                            Add one
+                        </Link>
+                    </span>
+                )}
+                {expanded && (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded(false)}
+                        className="tdx-focus-ring rounded"
+                    >
+                        <span className="text-[var(--accent-primary)]">Collapse</span> to
+                        around episode {Math.min(next, totalEpisodes)}
+                    </button>
+                )}
+                {filter === "arc" && skippable.size > 0 && (
+                    <span className="text-[var(--text-muted)]">
+                        {skippable.size} filler / clip show
+                        {skippable.size === 1 ? "" : "s"} hidden — numbering still
+                        follows the broadcast order.
+                    </span>
+                )}
+            </div>
 
-            {!guest && openEpisode !== null && (
+            {openEpisode !== null && (
                 <EpisodeCheckInModal
-                    key={openEpisode}
                     open
                     seriesId={seriesId}
-                    initialNote={notes[openEpisode] ?? ""}
                     seriesTitle={seriesTitle}
+                    totalEpisodes={totalEpisodes}
                     episodeNumber={openEpisode}
-                    episodeTitle={byNumber.get(openEpisode)?.title ?? null}
-                    episodeSynopsis={byNumber.get(openEpisode)?.synopsis ?? null}
-                    episodeType={byNumber.get(openEpisode)?.episode_type ?? null}
+                    episodeTitle={byNumber.get(openEpisode)?.title}
+                    episodeSynopsis={byNumber.get(openEpisode)?.synopsis}
+                    episodeType={byNumber.get(openEpisode)?.episode_type}
+                    initialNote={notes[openEpisode] ?? ""}
+                    initialStatus={status === "plan_to_watch" ? "watching" : status}
+                    episodesLogged={episodesLogged}
                     onClose={() => setOpenEpisode(null)}
                 />
             )}

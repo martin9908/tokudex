@@ -45,6 +45,12 @@ export default function PrivacyPage() {
                                 counts, rankings — are public.
                             </p>
                             <p>
+                                Community shows what people log — a handle, a
+                                title and an episode number, kept for 90 days.
+                                It never includes notes or ratings, and you can
+                                switch your own activity off from Account.
+                            </p>
+                            <p>
                                 Your display name appears on share cards you
                                 create yourself and nowhere else. Administrators
                                 can review submissions, reports, revision history

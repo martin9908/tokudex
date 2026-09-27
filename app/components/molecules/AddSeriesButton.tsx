@@ -42,7 +42,7 @@ export default function AddSeriesButton({
                 className={buttonClasses()}
             >
                 <Plus size={14} aria-hidden />
-                {added ? "Added to tracker" : pending ? "Adding…" : "Add to tracker"}
+                {added ? "In your dex" : pending ? "Adding…" : "Start tracking"}
             </button>
             {error && (
                 <p role="alert" className="mt-2 text-xs text-[var(--warning)]">

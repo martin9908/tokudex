@@ -48,8 +48,13 @@ test("member submits, admin approves, member watches and rates a movie", async (
         await login(page, `member-${suffix}@example.com`);
         await page.goto("/community/new");
         await page.getByLabel("Title", { exact: true }).fill(title);
-        await page.getByRole("radio", { name: "Anime", exact: true }).check();
-        await page.getByRole("radio", { name: "Movie", exact: true }).check();
+        // The radios are visually hidden behind their choice tiles.
+        await page
+            .getByRole("radio", { name: "Anime", exact: true })
+            .check({ force: true });
+        await page
+            .getByRole("radio", { name: "Movie", exact: true })
+            .check({ force: true });
         await page.getByLabel("Release year").fill("2026");
         await page.getByLabel(/Runtime/).fill("90");
         await page
@@ -64,8 +69,8 @@ test("member submits, admin approves, member watches and rates a movie", async (
         await page
             .getByRole("button", { name: "Submit title", exact: true })
             .click();
-        await expect(page).toHaveURL("/community");
-        await expect(page.getByText(/pending/i)).toBeVisible();
+        await expect(page).toHaveURL("/community/submissions");
+        await expect(page.getByText("Pending", { exact: true })).toBeVisible();
         const admin = await adminContext.newPage();
         await login(admin, `admin-${suffix}@example.com`);
         await admin.goto("/admin");
@@ -100,9 +105,8 @@ test("member submits, admin approves, member watches and rates a movie", async (
         ).toBeVisible();
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto("/series?filter=movies");
-        await expect(
-            page.getByRole("heading", { name: title, exact: true }),
-        ).toBeVisible();
+        await expect(page.getByText(title, { exact: true })).toBeVisible();
+        await expect(page.getByText("Watched · 9/10")).toBeVisible();
         expect(
             await page.evaluate(
                 () => document.documentElement.scrollWidth <= window.innerWidth,

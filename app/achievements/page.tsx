@@ -1,20 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-    Medal,
-    Trophy,
-    SealCheck,
-    LockSimple,
-    HourglassMedium,
-} from "@phosphor-icons/react/ssr";
 import { getAchievementsView } from "@/lib/achievementState";
 import { RANKS } from "@/lib/achievements";
 import { STATS_SHARE_KEY } from "@/lib/share";
-import { ProgressBar, buttonClasses } from "../components/atoms";
+import { createClient } from "@/lib/supabase/server";
+import { BigNumber, Bar, HairlineRule, buttonClasses } from "../components/atoms";
 import ShareButton from "../components/molecules/ShareButton";
 
 export const metadata = {
-    title: "Achievements",
+    title: "Awards",
 };
 
 function earnedDate(iso?: string): string | null {
@@ -25,86 +19,18 @@ function earnedDate(iso?: string): string | null {
     });
 }
 
-type CardItem = {
-    key: string;
-    title: string;
-    description: string;
-    earned: boolean;
-    current: number;
-    target: number;
-};
-
-/** Milestone / trophy card — accent rule on the left once it's unlocked. */
-function AchievementCard({
-    item,
-    earnedAt,
-    icon,
-}: {
-    item: CardItem;
-    earnedAt?: string;
-    icon: "medal" | "trophy";
-}) {
-    const date = earnedDate(earnedAt);
-    const EarnedIcon = icon === "medal" ? Medal : Trophy;
-    return (
-        <li
-            className={`tdx-panel p-3.5 ${item.earned ? "border-l-[3px] border-l-[var(--accent-primary)]" : ""}`}
-        >
-            <div className="flex items-center gap-2.5">
-                {item.earned ? (
-                    <EarnedIcon
-                        size={18}
-                        weight="fill"
-                        className="text-[var(--accent-primary)] flex-none"
-                        aria-hidden
-                    />
-                ) : icon === "trophy" ? (
-                    <Trophy size={18} className="text-[var(--text-muted)] flex-none" aria-hidden />
-                ) : (
-                    <HourglassMedium size={18} className="text-[var(--text-muted)] flex-none" aria-hidden />
-                )}
-                <p
-                    className={`text-[13.5px] font-medium ${item.earned ? "" : "text-[var(--text-secondary)]"}`}
-                >
-                    {item.title}
-                </p>
-            </div>
-            <p className="text-[11.5px] text-[var(--text-secondary)] mt-1.5">
-                {item.description}
-            </p>
-            {item.earned ? (
-                <div className="mt-2 flex items-center gap-3 flex-wrap">
-                    <p className="text-[11px] text-[var(--accent-primary)]">
-                        {date ? `Unlocked ${date}` : "Unlocked"}
-                    </p>
-                    <ShareButton
-                        shareKey={item.key}
-                        variant="ghost"
-                        text={`I unlocked "${item.title}" on TokuDex!`}
-                        className="ml-auto"
-                    />
-                </div>
-            ) : (
-                item.target > 1 && (
-                    <>
-                        <ProgressBar
-                            value={item.current}
-                            max={item.target}
-                            muted
-                            className="mt-2.5"
-                            label={`${item.current} of ${item.target}`}
-                        />
-                        <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
-                            {item.current} / {item.target}
-                        </p>
-                    </>
-                )
-            )}
-        </li>
-    );
+/** "Ohsama Sentai King-Ohger" → "King-Ohger" for the badge chips. */
+function shortTitle(title: string): string {
+    const stripped = title.replace(/^(?:\S+\s+Sentai|Kamen Rider|Ultraman)\s+/i, "").trim();
+    // Keep the franchise for one-letter survivors like "Ultraman Z" or "Kamen Rider W".
+    return stripped.length > 2 ? stripped : title;
 }
 
-export default async function AchievementsPage() {
+function sentence(parts: string[]): string {
+    return parts.filter(Boolean).join(" ");
+}
+
+export default async function AwardsPage() {
     const view = await getAchievementsView();
     if (!view) redirect("/login");
 
@@ -114,219 +40,275 @@ export default async function AchievementsPage() {
         rankNext,
         milestones,
         collections,
-        seriesBadges,
         earnedAt,
-        earnedCount,
-        totalCount,
     } = view;
 
-    const rankPct = rankNext
-        ? Math.round(
-              ((episodesLogged - rankCurrent.min) /
-                  (rankNext.min - rankCurrent.min)) *
-                  100,
-          )
-        : 100;
-    const earnedBadges = seriesBadges.filter((b) => b.earned);
-    const lockedBadges = seriesBadges.filter((b) => !b.earned);
-    const previewLocked = Math.max(0, 6 - earnedBadges.length);
-    const shownBadges = [...earnedBadges, ...lockedBadges.slice(0, previewLocked)];
-    const remainingBadges = lockedBadges.slice(previewLocked);
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    const { data: rows } = user
+        ? await client
+              .from("user_series_progress")
+              .select(
+                  "current_episode, status, last_watched_at, series(id, title, total_episodes, format, hidden)",
+              )
+              .eq("user_id", user.id)
+        : { data: null };
+    type Row = {
+        current_episode: number;
+        status: string;
+        last_watched_at: string;
+        series: {
+            id: string;
+            title: string;
+            total_episodes: number | null;
+            format: string;
+            hidden: boolean;
+        } | null;
+    };
+    const tracked = ((rows ?? []) as unknown as Row[]).filter(
+        (r) => r.series && !r.series.hidden && r.series.format === "series",
+    );
+    const finished = tracked
+        .filter((r) => r.status === "completed")
+        .sort(
+            (a, b) =>
+                new Date(b.last_watched_at).getTime() -
+                new Date(a.last_watched_at).getTime(),
+        );
+    const inProgress = tracked
+        .filter((r) => r.status === "watching" && r.current_episode > 0)
+        .sort((a, b) => b.current_episode - a.current_episode)[0];
+
+    const earnedMilestones = milestones.filter((m) => m.earned).length;
+    const earnedTrophies = collections.filter((c) => c.earned);
+    const nearestTrophy = collections
+        .filter((c) => !c.earned && c.current > 0)
+        .sort((a, b) => b.current / b.target - a.current / a.target)[0];
+    const toNext = rankNext ? rankNext.min - episodesLogged : 0;
+
+    const summary = sentence([
+        finished.length === 0
+            ? "Nothing finished yet — the first badge unlocks with the last episode of any series."
+            : `${finished.length === 1 ? "One series" : `${finished.length} series`} finished.`,
+        earnedTrophies.length
+            ? `${earnedTrophies.map((c) => c.title).slice(0, 2).join(" and ")} ${earnedTrophies.length === 1 ? "is" : "are"} yours${earnedTrophies.length > 2 ? `, with ${earnedTrophies.length - 2} more` : ""}.`
+            : "",
+        nearestTrophy
+            ? `${nearestTrophy.target - nearestTrophy.current} short of ${nearestTrophy.title}${inProgress ? `, and ${inProgress.series!.title} is still going.` : "."}`
+            : inProgress
+              ? `${inProgress.series!.title} is the closest to done.`
+              : "",
+    ]);
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 w-full flex flex-col gap-5">
-            <div className="flex items-end gap-3 flex-wrap">
-                <div>
-                    <h1 className="text-[24px] tracking-[-0.02em]">Achievements</h1>
-                    <p className="text-[12.5px] text-[var(--text-secondary)] mt-1">
-                        {earnedCount} of {totalCount} unlocked
-                    </p>
-                </div>
-                <Link
-                    href="/invite"
-                    className={buttonClasses({
-                        variant: "secondary",
-                        size: "sm",
-                        className: "ml-auto",
-                    })}
-                >
-                    Invite friends
-                </Link>
-            </div>
-
-            <section className="tdx-panel p-4">
-                <div className="flex items-center gap-2.5">
-                    <span className="tdx-eyebrow">Rank</span>
-                    <span className="tdx-chip tdx-chip-accent ml-auto text-[11.5px]">
+        <div className="w-full pb-24 md:pb-10">
+            <div className="grid md:grid-cols-[2fr_1fr]">
+                <section className="px-[18px] md:px-[30px] pt-[26px] md:pt-8 pb-6 md:pb-8 md:border-r md:border-[var(--line)]">
+                    <p className="text-[11.5px] tracking-[0.34em] uppercase text-[var(--text-secondary)] font-medium">
                         {rankCurrent.title}
-                    </span>
-                </div>
-                <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-[26px] font-medium leading-none">
-                        {episodesLogged}
-                    </span>
-                    <span className="text-[12.5px] text-[var(--text-secondary)]">
-                        tokusatsu episodes logged
-                    </span>
-                </div>
-                <ProgressBar
-                    value={rankPct}
-                    max={100}
-                    size="md"
-                    className="mt-3"
-                    label={rankNext ? `${rankPct}% to ${rankNext.title}` : "Max rank"}
-                />
-                <div className="flex justify-between mt-1.5 text-[11.5px] text-[var(--text-secondary)]">
-                    <span>
-                        {rankNext
-                            ? `${rankPct}% to ${rankNext.title}`
-                            : "Max rank reached"}
-                    </span>
-                    <span>{rankNext ? `${rankNext.min} episodes` : ""}</span>
-                </div>
-                <div className="flex gap-2 mt-3.5 flex-wrap items-start">
-                    <ShareButton
-                        shareKey={STATS_SHARE_KEY}
-                        kind="stats"
-                        size="md"
-                        label="Share my stats"
-                        text={`I'm rank ${rankCurrent.title} with ${episodesLogged} episodes logged on TokuDex!`}
-                    />
-                    <details className="relative">
-                        <summary className={buttonClasses({ variant: "secondary", className: "list-none" })}>
-                            See all ranks
-                        </summary>
-                        <ol className="tdx-panel absolute left-0 mt-2 p-2 w-[240px] z-10 flex flex-col">
-                            {RANKS.map((r) => (
-                                <li
-                                    key={r.title}
-                                    className={`flex justify-between px-2 py-1.5 rounded text-xs ${
-                                        r.title === rankCurrent.title
-                                            ? "bg-[var(--accent-tint)] text-[var(--accent-on)]"
-                                            : "text-[var(--text-secondary)]"
-                                    }`}
-                                >
-                                    <span>{r.title}</span>
-                                    <span className="tabular-nums">{r.min}+</span>
-                                </li>
-                            ))}
-                        </ol>
-                    </details>
-                </div>
-            </section>
-
-            <section>
-                <div className="flex items-baseline gap-2.5 mb-2.5">
-                    <h2 className="text-sm font-medium">Milestones</h2>
-                    <span className="text-[11.5px] text-[var(--text-muted)]">
-                        {milestones.filter((m) => m.earned).length} of {milestones.length}
-                    </span>
-                </div>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {milestones.map((m) => (
-                        <AchievementCard
-                            key={m.key}
-                            icon="medal"
-                            earnedAt={earnedAt[`ach-${m.key}`]}
-                            item={{
-                                key: `ach-${m.key}`,
-                                title: m.label,
-                                description: m.description,
-                                earned: m.earned,
-                                current: m.current,
-                                target: m.target,
-                            }}
+                    </p>
+                    <div className="flex items-baseline gap-[14px] mt-5">
+                        <BigNumber size={68}>{episodesLogged.toLocaleString()}</BigNumber>
+                        <span className="text-[14px] text-[var(--text-secondary)]">
+                            episodes logged
+                        </span>
+                    </div>
+                    <div className="mt-6">
+                        <Bar
+                            value={episodesLogged - rankCurrent.min}
+                            max={rankNext ? rankNext.min - rankCurrent.min : 1}
+                            label={rankNext ? `Progress to ${rankNext.title}` : "Top rank"}
                         />
-                    ))}
-                </ul>
-            </section>
-
-            <section>
-                <div className="flex items-baseline gap-2.5 mb-2.5">
-                    <h2 className="text-sm font-medium">Franchise trophies</h2>
-                    <span className="text-[11.5px] text-[var(--text-muted)]">
-                        every season in a franchise
-                    </span>
-                </div>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {collections.map((c) => (
-                        <AchievementCard
-                            key={c.key}
-                            icon="trophy"
-                            earnedAt={earnedAt[`col-${c.key}`]}
-                            item={{
-                                key: `col-${c.key}`,
-                                title: c.title,
-                                description: c.description,
-                                earned: c.earned,
-                                current: c.current,
-                                target: c.target,
-                            }}
+                        <div className="flex justify-between mt-2 text-[12px] text-[var(--text-secondary)]">
+                            <span>
+                                {rankNext
+                                    ? `${toNext.toLocaleString()} more and you're a ${rankNext.title}`
+                                    : "Top of the ladder"}
+                            </span>
+                            <span>{rankNext ? rankNext.min.toLocaleString() : ""}</span>
+                        </div>
+                    </div>
+                    <div className="flex gap-[9px] mt-6 flex-wrap items-start">
+                        <ShareButton
+                            shareKey={STATS_SHARE_KEY}
+                            kind="stats"
+                            size="md"
+                            label="Share this"
+                            text={`I'm rank ${rankCurrent.title} with ${episodesLogged} episodes logged on TokuDex!`}
                         />
-                    ))}
-                </ul>
-            </section>
-
-            <section>
-                <div className="flex items-baseline gap-2.5 mb-2.5">
-                    <h2 className="text-sm font-medium">Series badges</h2>
-                    <span className="text-[11.5px] text-[var(--text-muted)]">
-                        one per finished series · {earnedBadges.length} earned
-                    </span>
-                </div>
-                <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                    {shownBadges.map((b) => (
-                        <li
-                            key={b.key}
-                            className={`tdx-panel p-3 text-center ${b.earned ? "border-l-[3px] border-l-[var(--accent-primary)]" : ""}`}
+                        <details className="relative">
+                            <summary
+                                className={buttonClasses({
+                                    variant: "secondary",
+                                    className: "list-none",
+                                })}
+                            >
+                                Every rank
+                            </summary>
+                            <ol className="absolute left-0 mt-2 p-2 w-[240px] z-10 flex flex-col rounded-lg border border-[var(--line)] bg-[var(--background)]">
+                                {RANKS.map((r) => (
+                                    <li
+                                        key={r.title}
+                                        className={`flex justify-between px-2 py-1.5 rounded text-xs ${
+                                            r.title === rankCurrent.title
+                                                ? "text-[var(--accent-primary)]"
+                                                : "text-[var(--text-secondary)]"
+                                        }`}
+                                    >
+                                        <span>{r.title}</span>
+                                        <span className="tabular-nums">{r.min}+</span>
+                                    </li>
+                                ))}
+                            </ol>
+                        </details>
+                        <Link
+                            href="/invite"
+                            className={buttonClasses({ variant: "ghost" })}
                         >
-                            {b.earned ? (
-                                <SealCheck size={22} weight="fill" className="mx-auto text-[var(--accent-primary)]" aria-hidden />
-                            ) : (
-                                <LockSimple size={22} className="mx-auto text-[var(--text-muted)]" aria-hidden />
-                            )}
-                            <p
-                                className={`text-xs font-medium mt-2 leading-[1.25] ${b.earned ? "" : "text-[var(--text-secondary)]"}`}
-                            >
-                                {b.series}
-                            </p>
-                            <p
-                                className={`text-[10.5px] mt-1 ${b.earned ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`}
-                            >
-                                {b.name}
-                            </p>
-                            {b.earned && (
-                                <ShareButton
-                                    shareKey={b.key}
-                                    variant="ghost"
-                                    text={`I finished ${b.series} on TokuDex — badge "${b.name}" unlocked!`}
-                                    className="justify-center mt-1.5"
-                                />
-                            )}
-                        </li>
-                    ))}
-                </ul>
-                {remainingBadges.length > 0 && (
-                    <details className="mt-3">
-                        <summary className="tdx-focus-ring grid place-items-center p-3 rounded-lg border border-dashed border-[var(--line)] text-[11.5px] text-[var(--accent-primary)] cursor-pointer list-none">
-                            See all {seriesBadges.length}
-                        </summary>
-                        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-3">
-                            {remainingBadges.map((b) => (
-                                <li key={b.key} className="tdx-panel p-3 text-center">
-                                    <LockSimple size={22} className="mx-auto text-[var(--text-muted)]" aria-hidden />
-                                    <p className="text-xs font-medium mt-2 leading-[1.25] text-[var(--text-secondary)]">
-                                        {b.series}
-                                    </p>
-                                    <p className="text-[10.5px] mt-1 text-[var(--text-muted)]">
-                                        {b.name}
-                                    </p>
-                                </li>
-                            ))}
-                        </ul>
-                    </details>
+                            Invite friends
+                        </Link>
+                    </div>
+                </section>
+                <aside className="px-[18px] md:px-[26px] pb-6 md:py-8 text-[12.5px] text-[var(--text-secondary)] leading-[1.7]">
+                    {summary}
+                </aside>
+            </div>
+            <HairlineRule />
+
+            <div className="flex items-baseline gap-[14px] px-[18px] md:px-[30px] pt-[22px] pb-[14px]">
+                <h2 className="text-[14px] font-medium">Milestones</h2>
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                    {earnedMilestones} of {milestones.length}
+                </span>
+            </div>
+            <div className="flex flex-col">
+                {milestones.map((m) => {
+                    const date = earnedDate(earnedAt[`ach-${m.key}`]);
+                    return (
+                        <div
+                            key={m.key}
+                            className="tdx-row rounded-none grid grid-cols-[1fr_130px] gap-[18px] items-center px-[18px] md:px-[30px] py-3"
+                        >
+                            <div className="min-w-0">
+                                <p
+                                    className={`text-[13.5px] ${m.earned ? "" : "text-[var(--text-secondary)]"}`}
+                                >
+                                    {m.label}
+                                </p>
+                                <p className="text-[11.5px] text-[var(--text-secondary)] mt-1">
+                                    {m.description}
+                                </p>
+                            </div>
+                            <div className="text-right text-[12px] whitespace-nowrap tabular-nums flex items-center justify-end gap-2">
+                                {m.earned ? (
+                                    <>
+                                        <span className="text-[var(--accent-primary)]">
+                                            {date ?? "Unlocked"}
+                                        </span>
+                                        <ShareButton
+                                            shareKey={`ach-${m.key}`}
+                                            variant="ghost"
+                                            text={`I unlocked "${m.label}" on TokuDex!`}
+                                        />
+                                    </>
+                                ) : (
+                                    <span className="text-[var(--text-secondary)]">
+                                        {m.current} / {m.target}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <HairlineRule />
+
+            <div className="flex items-baseline gap-[14px] px-[18px] md:px-[30px] pt-[22px] pb-[14px]">
+                <h2 className="text-[14px] font-medium">Finished</h2>
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                    {finished.length === 0
+                        ? "No badges yet"
+                        : `${finished.length} badge${finished.length === 1 ? "" : "s"}`}
+                </span>
+            </div>
+            <div className="flex flex-wrap gap-[9px] px-[18px] md:px-[30px] pb-[26px] text-[12.5px]">
+                {finished.map((r) => (
+                    <Link
+                        key={r.series!.id}
+                        href={`/series/${r.series!.id}`}
+                        className="tdx-focus-ring px-[11px] py-[6px] rounded-md border border-[var(--accent-primary)] text-[var(--accent-primary)]"
+                    >
+                        {shortTitle(r.series!.title)}
+                        {r.series!.total_episodes ? ` · ${r.series!.total_episodes}` : ""}
+                    </Link>
+                ))}
+                {inProgress && (
+                    <Link
+                        href={`/series/${inProgress.series!.id}`}
+                        className="tdx-focus-ring px-[11px] py-[6px] rounded-md text-[var(--text-secondary)]"
+                    >
+                        {shortTitle(inProgress.series!.title)} · {inProgress.current_episode}
+                        {inProgress.series!.total_episodes
+                            ? ` of ${inProgress.series!.total_episodes}`
+                            : ""}
+                    </Link>
                 )}
-            </section>
+                {finished.length === 0 && !inProgress && (
+                    <span className="text-[12px] text-[var(--text-muted)]">
+                        Finish a series and its badge lands here.
+                    </span>
+                )}
+            </div>
+            <HairlineRule />
+
+            <div className="flex items-baseline gap-[14px] px-[18px] md:px-[30px] pt-[22px] pb-[14px]">
+                <h2 className="text-[14px] font-medium">Franchise trophies</h2>
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                    every season in a franchise
+                </span>
+            </div>
+            <div className="flex flex-col pb-6">
+                {collections.map((c) => {
+                    const date = earnedDate(earnedAt[`col-${c.key}`]);
+                    return (
+                        <div
+                            key={c.key}
+                            className="tdx-row rounded-none grid grid-cols-[1fr_130px] gap-[18px] items-center px-[18px] md:px-[30px] py-3"
+                        >
+                            <div className="min-w-0">
+                                <p
+                                    className={`text-[13.5px] ${c.earned ? "" : "text-[var(--text-secondary)]"}`}
+                                >
+                                    {c.title}
+                                </p>
+                                <p className="text-[11.5px] text-[var(--text-secondary)] mt-1">
+                                    {c.description}
+                                </p>
+                            </div>
+                            <div className="text-right text-[12px] whitespace-nowrap tabular-nums flex items-center justify-end gap-2">
+                                {c.earned ? (
+                                    <>
+                                        <span className="text-[var(--accent-primary)]">
+                                            {date ?? "Unlocked"}
+                                        </span>
+                                        <ShareButton
+                                            shareKey={`col-${c.key}`}
+                                            variant="ghost"
+                                            text={`I earned the "${c.title}" trophy on TokuDex!`}
+                                        />
+                                    </>
+                                ) : (
+                                    <span className="text-[var(--text-secondary)]">
+                                        {c.current} / {c.target}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

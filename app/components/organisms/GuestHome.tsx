@@ -11,7 +11,7 @@ export default async function GuestHome() {
     const series = await getGuestSeries();
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 flex flex-col gap-5">
+        <div className="w-full px-4 sm:px-6 py-6 pb-24 md:pb-10 flex flex-col gap-5">
             <div className="tdx-callout">
                 <DeviceMobile size={16} className="mt-0.5 flex-none" aria-hidden />
                 <span>
@@ -43,7 +43,7 @@ export default async function GuestHome() {
                         Sign in
                     </Link>
                     <Link
-                        href="/series"
+                        href="/community/catalog"
                         className={buttonClasses({ variant: "ghost" })}
                     >
                         Browse the catalog →
@@ -60,7 +60,7 @@ export default async function GuestHome() {
                         the latest run in each franchise
                     </span>
                     <Link
-                        href="/series"
+                        href="/community/catalog"
                         className="ml-auto text-xs text-[var(--accent-primary)]"
                     >
                         Browse library →

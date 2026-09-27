@@ -150,17 +150,36 @@ export default async function PosterPicker({
                                 Wrong aspect ratio is the usual problem — anything outside 3:4 is letterboxed in the grid, not cropped.
                             </p>
                             <div className="flex gap-2 mt-3 flex-wrap">
-                                <button className={buttonClasses()}>Assign poster</button>
-                                {item.hidden && (
-                                    <button
-                                        name="hidden"
-                                        value="false"
-                                        className={buttonClasses({ variant: "secondary" })}
-                                    >
-                                        Assign and publish
-                                    </button>
+                                {item.hidden ? (
+                                    <>
+                                        <button
+                                            name="hidden"
+                                            value="false"
+                                            className={buttonClasses()}
+                                        >
+                                            Assign and publish
+                                        </button>
+                                        <button className={buttonClasses({ variant: "secondary" })}>
+                                            Assign only
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button className={buttonClasses()}>Assign poster</button>
                                 )}
                             </div>
+                        </ActionForm>
+                    )}
+                    {item.hidden && (
+                        <ActionForm action={moderateTitle} className="mt-2">
+                            <input type="hidden" name="id" value={item.id} />
+                            <input type="hidden" name="revision" value={item.revision} />
+                            <button
+                                name="hidden"
+                                value="false"
+                                className={buttonClasses({ variant: "secondary" })}
+                            >
+                                Publish without art
+                            </button>
                         </ActionForm>
                     )}
 

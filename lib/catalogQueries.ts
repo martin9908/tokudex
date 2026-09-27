@@ -1,10 +1,19 @@
 import { createClient } from "./supabase/server";
-import { catalogParams, type CatalogItem } from "./catalog";
+import {
+    catalogParams,
+    CATALOG_FILTERS,
+    DEX_FILTERS,
+    type CatalogItem,
+} from "./catalog";
 export async function getCatalogPage(
     input: { q?: string; filter?: string; page?: string },
     ranked = false,
+    filters: "catalog" | "dex" = "catalog",
 ) {
-    const params = catalogParams(input);
+    const params = catalogParams(
+        input,
+        filters === "dex" ? DEX_FILTERS : CATALOG_FILTERS,
+    );
     const client = await createClient();
     const { data, error } = await client.rpc("catalog_page", {
         p_filter: params.filter,
@@ -17,6 +26,22 @@ export async function getCatalogPage(
         ...params,
         ...(data as { items: CatalogItem[]; total: number; page: number }),
     };
+}
+export async function getCatalogCredits(ids: string[]) {
+    if (!ids.length) return {} as Record<string, string>;
+    const client = await createClient();
+    const { data } = await client.rpc("catalog_credits", { p_ids: ids });
+    return Object.fromEntries(
+        ((data ?? []) as { series_id: string; handle: string }[]).map((c) => [
+            c.series_id,
+            c.handle,
+        ]),
+    ) as Record<string, string>;
+}
+export async function getNearlyRanked() {
+    const client = await createClient();
+    const { data } = await client.rpc("catalog_nearly_ranked");
+    return (data ?? []) as { series_id: string; title: string; vote_count: number }[];
 }
 export async function getRatingSummary(id: string) {
     const client = await createClient();

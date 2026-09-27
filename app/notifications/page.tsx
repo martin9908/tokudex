@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getEarnedAchievements } from "@/lib/achievementState";
+import { getRatingSummary } from "@/lib/catalogQueries";
 import NotificationsList, { type Notice } from "./NotificationsList";
+import NotificationPrefs from "./NotificationPrefs";
+import SubmissionTimeline, { buildTimeline } from "./SubmissionTimeline";
 
 export const metadata: Metadata = {
     title: "Notifications",
@@ -21,8 +24,14 @@ export default async function NotificationsPage() {
     } = await client.auth.getUser();
     if (!user) redirect("/login");
 
-    const [{ data: decisions }, { data: unlocks }, { data: recruits }, earned] =
-        await Promise.all([
+    const [
+        { data: decisions },
+        { data: unlocks },
+        { data: recruits },
+        earned,
+        { data: latest },
+        { data: prefs },
+    ] = await Promise.all([
             client
                 .from("catalog_submissions")
                 .select("id, series_id, status, reason, reviewed_at, created_at, payload")
@@ -43,7 +52,45 @@ export default async function NotificationsPage() {
                 .order("created_at", { ascending: false })
                 .limit(20),
             getEarnedAchievements(),
+            client
+                .from("catalog_submissions")
+                .select(
+                    "id, series_id, status, reason, reviewed_at, created_at, payload, base_revision, series(cover_image_url)",
+                )
+                .eq("author_id", user.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle(),
+            client
+                .from("notification_prefs")
+                .select("weekly_recap")
+                .eq("user_id", user.id)
+                .maybeSingle(),
         ]);
+    let timeline: { title: string; steps: ReturnType<typeof buildTimeline> } | null = null;
+    if (latest) {
+        const summary =
+            latest.status === "published" && latest.series_id
+                ? await getRatingSummary(latest.series_id)
+                : null;
+        const poster = Boolean(
+            (latest.series as unknown as { cover_image_url: string | null } | null)
+                ?.cover_image_url,
+        );
+        timeline = {
+            title: (latest.payload as { title?: string })?.title ?? "Your submission",
+            steps: buildTimeline({
+                status: latest.status,
+                created_at: latest.created_at,
+                reviewed_at: latest.reviewed_at,
+                reason: latest.reason,
+                series_id: latest.series_id,
+                base_revision: latest.base_revision,
+                poster,
+                votes: summary ? Number(summary.vote_count) : 0,
+            }),
+        };
+    }
 
     const notices: Notice[] = [];
     for (const d of decisions ?? []) {
@@ -57,7 +104,7 @@ export default async function NotificationsPage() {
                 body: d.series_id
                     ? "Your submission was published. Anyone can track it now."
                     : "Your correction was published.",
-                href: d.series_id ? `/series/${d.series_id}` : "/community",
+                href: d.series_id ? `/series/${d.series_id}` : "/community/submissions",
                 at,
             });
         else
@@ -104,5 +151,15 @@ export default async function NotificationsPage() {
     });
     notices.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
-    return <NotificationsList notices={notices.slice(0, 60)} />;
+    return (
+        <div className="w-full px-4 sm:px-6 py-6 pb-24 md:pb-10 grid lg:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start">
+            <NotificationsList notices={notices.slice(0, 60)} />
+            <div className="flex flex-col gap-3.5">
+                {timeline && (
+                    <SubmissionTimeline title={timeline.title} steps={timeline.steps} />
+                )}
+                <NotificationPrefs weeklyRecap={prefs?.weekly_recap ?? false} />
+            </div>
+        </div>
+    );
 }

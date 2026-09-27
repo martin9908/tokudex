@@ -108,3 +108,32 @@ export function relativeTime(iso: string): string {
     const years = Math.floor(months / 12);
     return `${years} year${years === 1 ? "" : "s"} ago`;
 }
+
+const DAY_MS = 86_400_000;
+
+/** "Tue" within the last week, otherwise "14 Apr". */
+export function shortWhen(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const date = new Date(iso);
+    const days = (Date.now() - date.getTime()) / DAY_MS;
+    if (days < 1) return "today";
+    if (days < 7) return date.toLocaleDateString(undefined, { weekday: "short" });
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** "March" — for "nothing since March" / "last in July". */
+export function monthName(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    return new Date(iso).toLocaleDateString(undefined, { month: "long" });
+}
+
+/** True when a title has had no activity for 30 days or more. */
+export function isQuiet(iso: string | null | undefined): boolean {
+    if (!iso) return false;
+    return Date.now() - new Date(iso).getTime() >= 30 * DAY_MS;
+}
+
+/** ISO timestamp for "n days ago" — kept out of components so the purity lint is happy. */
+export function daysAgoIso(days: number): string {
+    return new Date(Date.now() - days * DAY_MS).toISOString();
+}

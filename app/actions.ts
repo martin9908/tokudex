@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildSnapshotFor, generateShareSlug } from "@/lib/share";
 import type { ProgressStatus } from "@/lib/validation";
-import { saveTracking } from "@/lib/tracking";
+import { saveTracking, saveEpisodeNote } from "@/lib/tracking";
 
 export async function setEpisodeProgress(seriesId: string, episode: number) {
     const data = await saveTracking({ seriesId, episode });
@@ -127,5 +127,70 @@ export async function deleteAccount() {
 
     const admin = createAdminClient();
     const { error } = await admin.auth.admin.deleteUser(user.id);
+    if (error) throw new Error(error.message);
+}
+
+/** Episodes logged across tokusatsu series — the number ranks are keyed off. */
+export async function getRankProgress(): Promise<{ logged: number } | null> {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) return null;
+    const { data } = await client
+        .from("user_series_progress")
+        .select("current_episode, series(category, format)")
+        .eq("user_id", user.id);
+    const logged = (
+        (data ?? []) as unknown as {
+            current_episode: number | null;
+            series: { category: string; format: string } | null;
+        }[]
+    ).reduce(
+        (n, r) =>
+            r.series?.category === "tokusatsu" && r.series.format === "series"
+                ? n + (r.current_episode ?? 0)
+                : n,
+        0,
+    );
+    return { logged };
+}
+
+/** Save or replace the private note on one logged episode without touching progress. */
+export async function saveNote(seriesId: string, episode: number, note: string) {
+    if (!Number.isInteger(episode) || episode < 1)
+        throw new Error("Invalid episode number");
+    await saveEpisodeNote(seriesId, episode, note);
+}
+
+/** Weekly recap preference. Nothing is emailed yet; the choice is kept for when it is. */
+export async function setWeeklyRecap(enabled: boolean) {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+    const { error } = await client.from("notification_prefs").upsert(
+        { user_id: user.id, weekly_recap: enabled, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" },
+    );
+    if (error) throw new Error("Could not save that preference.");
+}
+
+/** Public handle and whether your logging shows in the community feed. */
+export async function saveProfile(input: {
+    handle: string;
+    shareActivity: boolean;
+}) {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+    const { error } = await client.rpc("set_profile", {
+        p_handle: input.handle.trim().toLowerCase(),
+        p_display: null,
+        p_share_activity: input.shareActivity,
+    });
     if (error) throw new Error(error.message);
 }

@@ -5,6 +5,17 @@ export const CATALOG_FILTERS = {
     movies: "Movies",
 } as const;
 export type CatalogFilter = keyof typeof CATALOG_FILTERS;
+/** Community dex filters: franchise families, movies, and thin entries. */
+export const DEX_FILTERS = {
+    all: "All",
+    sentai: "Sentai",
+    rider: "Rider",
+    ultra: "Ultra",
+    movies: "Movies",
+    needs_work: "Needs work",
+} as const;
+export type DexFilter = keyof typeof DEX_FILTERS;
+export type AnyFilter = CatalogFilter | DexFilter;
 export type CatalogItem = {
     id: string;
     title: string;
@@ -23,6 +34,7 @@ export type CatalogItem = {
     average_score?: number | null;
     vote_count?: number;
     weighted_score?: number;
+    episode_count?: number;
 };
 export type CatalogEpisode = {
     episode_number: number;
@@ -42,17 +54,20 @@ export type CatalogPayload = Pick<
     | "release_year"
     | "runtime_minutes"
 > & { episodes: CatalogEpisode[]; original_run?: string | null };
-export function catalogParams(input: {
-    q?: string | string[];
-    filter?: string | string[];
-    page?: string | string[];
-}) {
+export function catalogParams(
+    input: {
+        q?: string | string[];
+        filter?: string | string[];
+        page?: string | string[];
+    },
+    allowed: Record<string, string> = CATALOG_FILTERS,
+) {
     const first = (value: string | string[] | undefined) =>
         Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
     const rawFilter = first(input.filter);
     const rawPage = first(input.page);
-    const filter: CatalogFilter = Object.hasOwn(CATALOG_FILTERS, rawFilter)
-        ? (rawFilter as CatalogFilter)
+    const filter: AnyFilter = Object.hasOwn(allowed, rawFilter)
+        ? (rawFilter as AnyFilter)
         : "all";
     return {
         query: first(input.q).trim().slice(0, 200),
@@ -81,7 +96,7 @@ export function catalogMatches(
 }
 export function catalogHref(
     path: string,
-    filter: CatalogFilter,
+    filter: AnyFilter,
     query: string,
     page = 1,
 ) {

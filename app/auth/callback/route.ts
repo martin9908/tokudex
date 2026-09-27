@@ -1,4 +1,5 @@
 import { createClient } from "../../../lib/supabase/server";
+import { ensureProfile } from "../../../lib/profiles";
 import { NextResponse } from "next/server";
 
 // Handles the redirect after a user clicks an email confirmation/magic-link.
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
         const supabase = await createClient();
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error) {
+            await ensureProfile();
             return NextResponse.redirect(`${origin}${next}`);
         }
     }

@@ -156,7 +156,7 @@ export default function SubmissionForm({
                     } else {
                         await submitTitle(payload, links, seriesId, revision);
                     }
-                    router.push(reviewId ? "/admin" : "/community");
+                    router.push(reviewId ? "/admin" : "/community/submissions");
                     router.refresh();
                 } catch (e) {
                     setError(

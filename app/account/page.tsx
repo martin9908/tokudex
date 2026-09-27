@@ -8,6 +8,8 @@ import SignOutButton from "../components/molecules/SignOutButton";
 import SupportLink from "../components/molecules/SupportLink";
 import ThemeToggle from "../components/molecules/ThemeToggle";
 import EditNameForm from "./EditNameForm";
+import ProfileForm from "./ProfileForm";
+import { ensureProfile } from "@/lib/profiles";
 import ChangePasswordForm from "./ChangePasswordForm";
 import DeleteAccountButton from "./DeleteAccountButton";
 import { buttonClasses } from "../components/atoms";
@@ -28,6 +30,7 @@ export default async function AccountPage() {
     if (!user) redirect("/login");
 
     const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
+    const profile = await ensureProfile();
 
     return (
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 w-full">
@@ -40,12 +43,16 @@ export default async function AccountPage() {
                 <Link href="/achievements" className="tdx-pill">Awards</Link>
                 <Link href="/invite" className="tdx-pill">Invite friends</Link>
                 <Link href="/notifications" className="tdx-pill">Notifications</Link>
-                <Link href="/community" className="tdx-pill">My submissions</Link>
+                <Link href="/community/submissions" className="tdx-pill">My submissions</Link>
             </nav>
 
             <section className="tdx-panel p-4">
                 <h2 className="text-sm font-medium mb-3">Profile</h2>
                 <EditNameForm initialName={fullName ?? ""} />
+                <ProfileForm
+                    initialHandle={profile?.handle ?? ""}
+                    initialShare={profile?.share_activity ?? true}
+                />
                 <div className="flex items-center justify-between gap-3 mt-3 text-[12.5px]">
                     <span className="text-[var(--text-secondary)]">Email</span>
                     <span className="truncate">{user.email}</span>

@@ -4,6 +4,7 @@ import { headers, cookies } from "next/headers";
 import { createClient } from "../../lib/supabase/server";
 import { trackServer } from "@/lib/analytics";
 import { attributeReferral } from "@/lib/referrals";
+import { ensureProfile } from "@/lib/profiles";
 import { isValidEmail, validatePasswordStrength } from "@/lib/validation";
 import LoginForm from "./LoginForm";
 import { EnvelopeSimple, WarningCircle } from "@phosphor-icons/react/ssr";
@@ -46,6 +47,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             );
         }
 
+        await ensureProfile();
         await trackServer("login");
         redirect("/");
     }
@@ -98,6 +100,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             }
         }
 
+        await ensureProfile();
         await trackServer("signup");
         redirect("/welcome");
     }
