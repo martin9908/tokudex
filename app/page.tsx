@@ -1,326 +1,627 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProgressBySeries } from "@/lib/supabase/queries";
-import { getReferralCount } from "@/lib/referrals";
-import { toWatchItems, summarizeProgress, watchedPercent, type WatchItem } from "@/lib/progress";
-import { LinkButton, PosterImage, ProgressBar, buttonClasses } from "./components/atoms";
+import {
+    toWatchItems,
+    summarizeProgress,
+    shortWhen,
+    monthName,
+    isQuiet,
+    daysAgoIso,
+} from "@/lib/progress";
+import { episodeTypeLabel } from "@/lib/episodeTypes";
+import { franchiseFamily } from "@/lib/catalog";
+import { getCatalogCredits } from "@/lib/catalogQueries";
+import { getAchievementsView } from "@/lib/achievementState";
+import {
+    summarizeYear,
+    rowEpisodes,
+    type ActivityRow,
+} from "@/lib/yearActivity";
+import {
+    PosterImage,
+    BigNumber,
+    HairlineRule,
+    Bar,
+    TagChip,
+    buttonClasses,
+} from "./components/atoms";
 import LogEpisodeButton from "./components/organisms/LogEpisodeButton";
-import SupportBanner from "./components/molecules/SupportBanner";
-import Achievements from "./components/organisms/Achievements";
-import FranchiseAchievements from "./components/organisms/FranchiseAchievements";
 import GuestHome from "./components/organisms/GuestHome";
-import JsonLd from "./components/JsonLd";
-import { SITE_URL, SITE_NAME, absoluteUrl } from "@/lib/seo";
+import QuickLogButton from "./components/molecules/QuickLogButton";
+import YearChart from "./components/organisms/YearChart";
+import CloseToUnlocking from "./components/organisms/CloseToUnlocking";
+import NewInDex, { type NewTitle } from "./components/organisms/NewInDex";
+import { getGuestSeries } from "@/lib/guest";
 
-const websiteJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: SITE_NAME,
-    url: SITE_URL,
-    potentialAction: {
-        "@type": "SearchAction",
-        target: {
-            "@type": "EntryPoint",
-            urlTemplate: absoluteUrl("/series?q={search_term_string}"),
-        },
-        "query-input": "required name=search_term_string",
-    },
-};
+function Stat({
+    value,
+    label,
+    hint,
+    tone = "mute",
+    first = false,
+}: {
+    value: number;
+    label: string;
+    hint: string;
+    tone?: "text" | "mute";
+    first?: boolean;
+}) {
+    return (
+        <div
+            className={`flex-none ${first ? "pr-[26px]" : "px-[26px] border-l border-[var(--line)]"}`}
+        >
+            <div className="flex items-baseline gap-1.5">
+                <BigNumber size={27} tone={tone} className="tracking-[-0.035em]">
+                    {value.toLocaleString()}
+                </BigNumber>
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                    {label}
+                </span>
+            </div>
+            <div className="text-[11.5px] text-[var(--text-secondary)] mt-[7px] whitespace-nowrap">
+                {hint}
+            </div>
+        </div>
+    );
+}
 
 export default async function Home() {
     const client = await createClient();
-
     const {
         data: { user },
     } = await client.auth.getUser();
+    if (!user) return <GuestHome />;
 
-    // Guests (no account) get a read-only preview instead of the tracker home.
-    if (!user) {
-        return (
-            <>
-                <JsonLd data={websiteJsonLd} />
-                <GuestHome />
-            </>
+    const rows = await getUserProgressBySeries(user.id);
+    const items = toWatchItems(rows).filter((i) => !i.series.hidden);
+    const stats = summarizeProgress(rows);
+    const logged = items.reduce((n, i) => n + i.progress.current_episode, 0);
+
+    const series = items.filter((i) => i.series.format === "series");
+    const going = series
+        .filter((i) => i.progress.status === "watching")
+        .sort(
+            (a, b) =>
+                new Date(b.progress.last_watched_at).getTime() -
+                new Date(a.progress.last_watched_at).getTime(),
         );
-    }
+    const shelved = series.filter((i) => i.progress.status === "on_hold");
+    const upNext = going[0] ?? null;
+    const alsoGoing = [...going.slice(1), ...shelved];
+    const doneLately = items
+        .filter((i) => i.progress.status === "completed")
+        .sort(
+            (a, b) =>
+                new Date(b.progress.last_watched_at).getTime() -
+                new Date(a.progress.last_watched_at).getTime(),
+        )
+        .slice(0, 3);
 
-    const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
-    const displayName = fullName || user.email?.split("@")[0] || "there";
+    const since = daysAgoIso(7);
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const [
+        { data: nextEpisode },
+        { data: activityRows },
+        { data: submissionRows },
+        suggestions,
+        awards,
+        { data: newRows },
+        { count: addedThisMonth },
+    ] = await Promise.all([
+        upNext
+            ? client
+                  .from("episodes")
+                  .select("title, synopsis, episode_type, air_date")
+                  .eq("series_id", upNext.series.id)
+                  .eq("episode_number", upNext.progress.current_episode + 1)
+                  .maybeSingle()
+            : Promise.resolve({ data: null }),
+        client
+            .from("activity")
+            .select("kind, episodes, created_at, series(title)")
+            .eq("user_id", user.id)
+            .in("kind", ["logged", "finished", "shelved"])
+            .gte("created_at", since < yearStart ? since : yearStart),
+        client
+            .from("catalog_submissions")
+            .select("status, series_id, base_revision")
+            .eq("author_id", user.id),
+        items.length === 0 ? getGuestSeries() : Promise.resolve([]),
+        getAchievementsView(),
+        client
+            .from("series")
+            .select(
+                "id, title, franchise, category, format, release_year, cover_image_url",
+            )
+            .eq("hidden", false)
+            .order("created_at", { ascending: false })
+            .limit(6),
+        client
+            .from("series")
+            .select("id", { count: "exact", head: true })
+            .eq("hidden", false)
+            .gte("created_at", monthStart),
+    ]);
 
-    let watchItems: WatchItem[] = [];
-    let stats = summarizeProgress([]);
-    let loadError = false;
-
-    try {
-        const rows = await getUserProgressBySeries(user.id);
-        watchItems = toWatchItems(rows);
-        stats = summarizeProgress(rows);
-    } catch {
-        loadError = true;
-    }
-
-    // Continue Tracking = series actively in progress; Recently Updated = any
-    // series by most recent activity (rows are already ordered by updated_at).
-    const featured = watchItems.filter((item) => item.progress.status === "watching").slice(0, 3);
-    const recentlyUpdated = watchItems.slice(0, 5);
-    const primaryItem = watchItems[0];
-
-    // Tracker Summary aggregates + the most-recent series for a quick resume.
-    const totalTracked = watchItems.length;
-    const episodesLogged = watchItems.reduce(
-        (sum, item) => sum + (item.progress.current_episode || 0),
-        0
+    const activity = (activityRows ?? []) as unknown as ActivityRow[];
+    const year = summarizeYear(
+        activity.filter((r) => new Date(r.created_at) >= new Date(yearStart)),
+        now,
     );
-    const primaryTotal = primaryItem?.series.total_episodes || 0;
-    const primaryCurrent = primaryItem?.progress.current_episode || 0;
-    const primaryPct = watchedPercent(primaryCurrent, primaryTotal);
-    const primaryNext = Math.min(primaryCurrent + 1, primaryTotal || primaryCurrent + 1);
-    const primaryHasNext = !!primaryItem && primaryCurrent < (primaryTotal || Infinity);
+    const thisWeek = activity
+        .filter((r) => new Date(r.created_at) >= new Date(since))
+        .reduce((n, r) => n + rowEpisodes(r), 0);
+    const newTitles = (newRows ?? []) as NewTitle[];
+    const credits = await getCatalogCredits(newTitles.map((s) => s.id));
+    const quiet = going.filter((i) => isQuiet(i.progress.last_watched_at)).length;
+    const lastFinished = doneLately[0]?.progress.last_watched_at;
+    const someday = items.filter((i) => i.progress.status === "plan_to_watch");
+    const oldestSomeday = someday
+        .map((i) => i.progress.last_watched_at)
+        .sort()[0];
+    const corrections = (submissionRows ?? []).filter(
+        (s) => s.base_revision !== null,
+    );
+    const correctionsPending = corrections.filter(
+        (s) => s.status === "pending",
+    ).length;
+    const correctionsRejected = corrections.filter(
+        (s) => s.status === "rejected",
+    ).length;
 
-    const completedSeries = watchItems
-        .filter((item) => item.progress.status === "completed")
-        .map((item) => ({ title: item.series.title, franchise: item.series.franchise }));
-
-    const referralCount = await getReferralCount(user.id);
+    const total = upNext?.series.total_episodes ?? null;
+    const current = upNext?.progress.current_episode ?? 0;
+    const next = current + 1;
+    const nextType = episodeTypeLabel(nextEpisode?.episode_type);
+    const lastLogged = upNext ? shortWhen(upNext.progress.last_watched_at) : null;
 
     return (
-        <div className="max-w-[1300px] mx-auto px-3 md:px-4 py-6 pb-24 md:pb-10">
-            <JsonLd data={websiteJsonLd} />
-            <main className="space-y-4">
-                <section className="tdx-panel p-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Welcome back, {displayName}!</h1>
-                            <p className="text-cyan-200/70 mt-1">
-                                Pick up where you left off. TokuDex tracks the tokusatsu you&apos;re watching — it doesn&apos;t stream them.
-                            </p>
-                        </div>
-                        <form action="/series" method="get" className="hidden md:block w-64">
-                            <input
-                                type="search"
-                                name="q"
-                                aria-label="Search series"
-                                placeholder="Search series..."
-                                className="tdx-field px-3 py-2.5"
-                            />
-                        </form>
+        <div className="w-full pb-24 md:pb-10">
+            {/* Stat strip */}
+            <div className="hidden md:flex items-stretch px-[30px] py-[20px] overflow-x-auto">
+                <Stat
+                    first
+                    value={logged}
+                    label="logged"
+                    hint={`${thisWeek} this week`}
+                    tone="text"
+                />
+                <Stat
+                    value={stats.watching}
+                    label="watching"
+                    hint={
+                        quiet === 0
+                            ? stats.watching === 0
+                                ? "pick one from your dex"
+                                : "all active"
+                            : quiet === 1
+                              ? "one gone quiet"
+                              : `${quiet} gone quiet`
+                    }
+                    tone="text"
+                />
+                <Stat
+                    value={stats.completed}
+                    label="finished"
+                    hint={
+                        lastFinished
+                            ? `last in ${monthName(lastFinished)}`
+                            : "none yet"
+                    }
+                />
+                <Stat
+                    value={stats.plan_to_watch}
+                    label="someday"
+                    hint={
+                        oldestSomeday
+                            ? `oldest added ${new Date(oldestSomeday).getFullYear()}`
+                            : "nothing waiting"
+                    }
+                />
+                <Stat
+                    value={corrections.length}
+                    label="corrections"
+                    hint={
+                        corrections.length === 0
+                            ? "none sent"
+                            : correctionsPending
+                              ? `${correctionsPending} pending`
+                              : correctionsRejected
+                                ? `${correctionsRejected} sent back`
+                                : "all accepted"
+                    }
+                />
+                <Link
+                    href="/achievements"
+                    className="tdx-focus-ring rounded-sm ml-auto pl-[26px] self-center text-[12.5px] text-[var(--text-primary)] whitespace-nowrap"
+                >
+                    Your year{" "}
+                    <span className="text-[var(--accent-primary)]">→</span>
+                </Link>
+            </div>
+            <HairlineRule className="hidden md:block" />
+
+            {items.length === 0 && (
+                <section className="px-[18px] md:px-[30px] py-[30px]">
+                    <p className="text-[12.5px] text-[var(--text-secondary)]">
+                        Empty library · first run
+                    </p>
+                    <h1 className="text-[22px] font-medium mt-2 tracking-[-0.02em]">
+                        Nothing tracked yet
+                    </h1>
+                    <p className="text-[13px] text-[var(--text-secondary)] mt-1.5 leading-[1.55] max-w-[420px]">
+                        Pick a series you&apos;re watching and log the episode
+                        you&apos;re on. Everything else — rank, badges,
+                        rankings — follows from that.
+                    </p>
+                    <div className="flex gap-2.5 mt-4 flex-wrap">
+                        <Link href="/welcome" className={buttonClasses()}>
+                            Get started
+                        </Link>
+                        <Link
+                            href="/community/catalog"
+                            className={buttonClasses({ variant: "secondary" })}
+                        >
+                            Browse the catalog
+                        </Link>
+                        <Link
+                            href="/community/new"
+                            className={buttonClasses({ variant: "secondary" })}
+                        >
+                            Add a title
+                        </Link>
                     </div>
-
-                    <h2 className="text-xl font-semibold mb-3">Continue Tracking</h2>
-                    {loadError ? (
-                        <p className="rounded-xl border border-red-900/45 bg-red-500/10 p-4 text-sm text-red-300">
-                            We couldn&apos;t load your tracker right now. Please refresh to try again.
-                        </p>
-                    ) : watchItems.length === 0 ? (
-                        <div className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-5">
-                            <p className="text-base font-semibold text-cyan-100">Welcome to TokuDex 👋</p>
-                            <p className="text-sm text-cyan-200/75 mt-1 mb-4">
-                                Your tokusatsu episode tracker — never lose your place again. Three steps to start:
-                            </p>
-                            <ol className="space-y-2.5 text-sm text-cyan-100/85 mb-5">
-                                {[
-                                    "Find a series in the library",
-                                    "Add it to your tracker",
-                                    "Log each episode and jot a quick recap",
-                                ].map((step, i) => (
-                                    <li key={i} className="flex items-start gap-2.5">
-                                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-semibold text-cyan-300">
-                                            {i + 1}
-                                        </span>
-                                        {step}
-                                    </li>
-                                ))}
-                            </ol>
-                            <LinkButton href="/series">Browse the series library →</LinkButton>
-                        </div>
-                    ) : featured.length === 0 ? (
-                        <p className="rounded-xl border border-cyan-900/45 bg-[#081a2b]/60 p-4 text-sm text-cyan-100/70">
-                            Nothing in progress right now — pick one back up from{" "}
-                            <Link href="/series" className="text-cyan-300 hover:text-cyan-200">
-                                your library
-                            </Link>
-                            .
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                            {featured.map(({ progress, series }) => {
-                                const cur = progress.current_episode || 0;
-                                const total = series.total_episodes || 0;
-                                const next = Math.min(cur + 1, total || cur + 1);
-                                const hasNext = cur < (total || Infinity);
-
-                                return (
-                                    <article
-                                        key={series.id}
-                                        className="rounded-xl border border-cyan-900/45 bg-[linear-gradient(145deg,#081b2c,#050d17)] p-3"
-                                    >
-                                        <div className="relative aspect-[3/4] rounded-lg border border-cyan-900/50 bg-[#091a2b] mb-3 overflow-hidden">
-                                            <PosterImage
-                                                src={series.cover_image_url}
-                                                alt={series.title}
-                                                sizes="(max-width: 640px) 90vw, 220px"
-                                                iconClassName="h-24 w-24 opacity-95"
-                                            />
-                                        </div>
-                                        <p className="text-[11px] tracking-[0.25em] text-cyan-200/75 uppercase mb-1">
-                                            {series.franchise || "Series"}
-                                        </p>
-                                        <h3 className="text-xl font-semibold uppercase leading-tight line-clamp-2">
-                                            {series.title}
-                                        </h3>
-                                        <p className="text-sm text-cyan-100/80 mt-1">
-                                            Episode {progress.current_episode || "1"}
-                                        </p>
-                                        <p className="text-sm text-cyan-200/70 mb-2">Tracking</p>
-                                        <ProgressBar
-                                            value={cur}
-                                            max={total || 1}
-                                            size="sm"
-                                            label={`${watchedPercent(cur, total)}% watched`}
-                                            className="mb-2"
-                                        />
-                                        <div className="mt-2 flex flex-col gap-2">
-                                            {hasNext && (
-                                                <LogEpisodeButton
-                                                    seriesId={series.id}
-                                                    seriesTitle={series.title}
-                                                    episodeNumber={next}
-                                                    className={buttonClasses({ variant: "primary", full: true })}
-                                                />
-                                            )}
-                                            <LinkButton href={`/series/${series.id}`} variant="secondary" full>
-                                                Open Tracker
-                                            </LinkButton>
-                                        </div>
-                                    </article>
-                                );
-                            })}
+                    {suggestions.length > 0 && (
+                        <div className="mt-6 flex flex-col">
+                            {suggestions.slice(0, 2).map((s, i) => (
+                                <Link
+                                    key={s.id}
+                                    href={`/series/${s.id}`}
+                                    className="tdx-focus-ring tdx-row flex items-center gap-3.5 py-3 border-t border-[var(--line)] last:border-b"
+                                >
+                                    <span className="text-[11.5px] text-[var(--text-secondary)] w-[130px] flex-none">
+                                        {i === 0
+                                            ? "Popular right now"
+                                            : "Good place to start"}
+                                    </span>
+                                    <span className="text-[13.5px]">
+                                        {s.title}
+                                    </span>
+                                </Link>
+                            ))}
                         </div>
                     )}
                 </section>
+            )}
 
-                {primaryItem && (
-                    <>
-                        <section className="tdx-panel p-4 md:p-5">
-                            <h2 className="text-2xl font-semibold mb-3">Tracker Summary</h2>
-                            <div className="grid grid-cols-3 gap-2 mb-4">
-                                <div className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3 text-center">
-                                    <p className="text-2xl font-bold text-cyan-300">{totalTracked}</p>
-                                    <p className="text-[11px] uppercase tracking-wider text-cyan-200/70">Series</p>
-                                </div>
-                                <div className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3 text-center">
-                                    <p className="text-2xl font-bold text-cyan-300">{episodesLogged}</p>
-                                    <p className="text-[11px] uppercase tracking-wider text-cyan-200/70">Episodes</p>
-                                </div>
-                                <div className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3 text-center">
-                                    <p className="text-2xl font-bold text-emerald-300">{stats.completed}</p>
-                                    <p className="text-[11px] uppercase tracking-wider text-cyan-200/70">Completed</p>
-                                </div>
-                            </div>
-
-                            <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-cyan-100/80">
-                                <span><span className="text-cyan-300 font-semibold">{stats.watching}</span> Watching</span>
-                                <span><span className="text-amber-300 font-semibold">{stats.on_hold}</span> On Hold</span>
-                                <span><span className="text-slate-300 font-semibold">{stats.plan_to_watch}</span> Plan</span>
-                            </div>
-
-                            <p className="text-xs uppercase tracking-wider text-cyan-200/70 mb-2">Most recent</p>
-                            <article className="rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3">
-                                <div className="flex items-center gap-4">
-                                    <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg border border-cyan-900/50 bg-[#091a2b]">
-                                        <PosterImage
-                                            src={primaryItem.series.cover_image_url}
-                                            alt={primaryItem.series.title}
-                                            sizes="64px"
-                                            iconClassName="h-9 w-9"
-                                        />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-xs tracking-[0.3em] uppercase text-cyan-300/80 mb-1">
-                                            {primaryItem.series.franchise || "Series"}
-                                        </p>
-                                        <p className="text-base font-semibold leading-tight line-clamp-1">
-                                            {primaryItem.series.title}
-                                        </p>
-                                        <p className="text-xs text-cyan-200/75 mt-0.5">
-                                            Episode {primaryCurrent || 1} of {primaryTotal || "?"} · updated{" "}
-                                            {new Date(primaryItem.progress.last_watched_at).toLocaleDateString()}
-                                        </p>
-                                        <ProgressBar
-                                            value={primaryCurrent}
-                                            max={primaryTotal || 1}
-                                            size="sm"
-                                            label={`${primaryPct}% watched`}
-                                            className="mt-2"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {primaryHasNext && (
-                                        <LogEpisodeButton
-                                            seriesId={primaryItem.series.id}
-                                            seriesTitle={primaryItem.series.title}
-                                            episodeNumber={primaryNext}
-                                            className={buttonClasses({ variant: "primary", className: "flex-1 min-w-[140px]" })}
-                                        />
-                                    )}
-                                    <LinkButton
-                                        href={`/series/${primaryItem.series.id}`}
-                                        variant="secondary"
-                                        className="flex-1 min-w-[140px]"
-                                    >
-                                        Open Tracker
-                                    </LinkButton>
-                                </div>
-                            </article>
-                        </section>
-
-                        <Achievements
-                            seriesTracked={totalTracked}
-                            episodesLogged={episodesLogged}
-                            seriesCompleted={stats.completed}
-                            referralCount={referralCount}
-                        />
-
-                        <FranchiseAchievements completed={completedSeries} />
-
-                        <section className="tdx-panel p-4 md:p-5">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-2xl font-semibold">Recently Updated</h2>
-                                <Link href="/series" className="text-sm text-cyan-300 hover:text-cyan-200">View All</Link>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                                {recentlyUpdated.map(({ progress, series }) => (
+            {items.length > 0 && (
+                <div className="grid md:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] xl:grid-cols-[minmax(0,1fr)_420px]">
+                    {/* Up next */}
+                    <section className="px-[18px] pt-[20px] pb-[8px] md:p-[30px] md:border-r md:border-[var(--line)]">
+                        {upNext ? (
+                            <>
+                                <p className="text-[12.5px] text-[var(--text-secondary)] md:hidden">
+                                    Up next
+                                </p>
+                                <div className="flex gap-[26px] md:mt-0">
                                     <Link
-                                        key={series.id}
-                                        href={`/series/${series.id}`}
-                                        className="tdx-focus-ring rounded-xl border border-cyan-900/45 bg-[#081a2b]/80 p-2.5 hover:border-cyan-700/45 transition-colors"
+                                        href={`/series/${upNext.series.id}`}
+                                        className="tdx-focus-ring hidden md:block relative w-[188px] aspect-[3/4] flex-none rounded-md overflow-hidden"
                                     >
-                                        <div className="relative aspect-[3/4] rounded-lg border border-cyan-900/50 bg-[#091a2b] mb-2 overflow-hidden">
-                                            <PosterImage
-                                                src={series.cover_image_url}
-                                                alt={series.title}
-                                                sizes="(max-width: 768px) 45vw, 180px"
-                                                iconClassName="h-14 w-14"
-                                            />
-                                        </div>
-                                        <p className="text-sm font-medium leading-tight mb-1">{series.title}</p>
-                                        <p className="text-xs text-cyan-200/70 mb-2">Episode {progress.current_episode || "1"}</p>
-                                        <ProgressBar
-                                            value={progress.current_episode || 0}
-                                            max={series.total_episodes || 1}
-                                            size="sm"
-                                            label={`${watchedPercent(progress.current_episode, series.total_episodes)}% watched`}
+                                        <PosterImage
+                                            src={upNext.series.cover_image_url}
+                                            alt={upNext.series.title}
+                                            sizes="188px"
+                                            loading="eager"
                                         />
                                     </Link>
-                                ))}
+                                    <div className="flex-1 min-w-0 flex flex-col">
+                                        <Link
+                                            href={`/series/${upNext.series.id}`}
+                                            className="tdx-focus-ring hidden md:block rounded-sm text-[11.5px] tracking-[0.34em] uppercase text-[var(--text-secondary)] font-medium"
+                                        >
+                                            {upNext.series.title}
+                                        </Link>
+                                        <div className="flex items-start gap-[14px] md:gap-4 mt-3 md:mt-5">
+                                            <BigNumber
+                                                size={46}
+                                                className="md:hidden leading-[0.9]"
+                                            >
+                                                {next}
+                                            </BigNumber>
+                                            <BigNumber
+                                                size={74}
+                                                className="hidden md:inline"
+                                            >
+                                                {next}
+                                            </BigNumber>
+                                            <div className="flex-1 min-w-0 pt-1 md:pt-1.5">
+                                                <Link
+                                                    href={`/series/${upNext.series.id}`}
+                                                    className="tdx-focus-ring md:hidden block text-[15px] font-medium leading-[1.25]"
+                                                >
+                                                    {upNext.series.title}
+                                                </Link>
+                                                <p className="text-[12px] text-[var(--text-secondary)] mt-[5px] md:mt-0 md:text-[17px] md:text-[var(--text-primary)] md:leading-[1.3] md:tracking-[-0.01em]">
+                                                    {nextEpisode?.title ??
+                                                        `Episode ${next}`}
+                                                </p>
+                                                <div className="flex gap-1.5 mt-[9px] flex-wrap empty:hidden">
+                                                    {nextType && (
+                                                        <TagChip accent>
+                                                            {nextType}
+                                                        </TagChip>
+                                                    )}
+                                                    {upNext.series.runtime_minutes && (
+                                                        <TagChip>
+                                                            {upNext.series.runtime_minutes}{" "}
+                                                            min
+                                                        </TagChip>
+                                                    )}
+                                                    {nextEpisode?.air_date && (
+                                                        <TagChip>
+                                                            {new Date(
+                                                                nextEpisode.air_date,
+                                                            ).toLocaleDateString(
+                                                                undefined,
+                                                                {
+                                                                    day: "numeric",
+                                                                    month: "short",
+                                                                    year: "numeric",
+                                                                },
+                                                            )}
+                                                        </TagChip>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 md:mt-[26px]">
+                                            {total ? (
+                                                <Bar
+                                                    value={current}
+                                                    max={total}
+                                                    label="Watch progress"
+                                                />
+                                            ) : null}
+                                            <div className="flex justify-between mt-2 text-[11.5px] md:text-[12px] text-[var(--text-secondary)]">
+                                                <span>
+                                                    {total
+                                                        ? `${current} down, ${total - current} to go`
+                                                        : `${current} logged`}
+                                                </span>
+                                                {lastLogged && (
+                                                    <span>
+                                                        Last logged {lastLogged}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-[9px] mt-4 md:mt-[22px]">
+                                            {(!total || current < total) && (
+                                                <LogEpisodeButton
+                                                    seriesId={upNext.series.id}
+                                                    seriesTitle={
+                                                        upNext.series.title
+                                                    }
+                                                    episodeNumber={next}
+                                                    episodeTitle={
+                                                        nextEpisode?.title
+                                                    }
+                                                    episodeSynopsis={
+                                                        nextEpisode?.synopsis
+                                                    }
+                                                    episodeType={
+                                                        nextEpisode?.episode_type
+                                                    }
+                                                    label={`Log ${next}`}
+                                                    className={buttonClasses({
+                                                        className:
+                                                            "flex-1 md:flex-none min-h-[46px] md:min-h-[40px] md:px-4",
+                                                    })}
+                                                />
+                                            )}
+                                            <Link
+                                                href={`/series/${upNext.series.id}`}
+                                                className={buttonClasses({
+                                                    variant: "secondary",
+                                                    className:
+                                                        "min-h-[46px] md:min-h-[36px]",
+                                                })}
+                                            >
+                                                <span className="md:hidden">
+                                                    Episodes
+                                                </span>
+                                                <span className="hidden md:inline">
+                                                    Episode list
+                                                </span>
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div>
+                                <p className="text-[12.5px] text-[var(--text-secondary)]">
+                                    Nothing on the go
+                                </p>
+                                <p className="text-[17px] mt-2 leading-[1.3]">
+                                    Everything you track is finished, shelved or
+                                    waiting for someday.
+                                </p>
+                                <div className="flex gap-2.5 mt-4 flex-wrap">
+                                    <Link
+                                        href="/series"
+                                        className={buttonClasses()}
+                                    >
+                                        Open your dex
+                                    </Link>
+                                    <Link
+                                        href="/community/catalog"
+                                        className={buttonClasses({
+                                            variant: "secondary",
+                                        })}
+                                    >
+                                        Browse the catalog
+                                    </Link>
+                                </div>
                             </div>
-                        </section>
-                    </>
-                )}
+                        )}
+                    </section>
 
-                <SupportBanner />
-            </main>
+                    {/* Also going / Done lately */}
+                    <aside className="md:px-[26px] md:py-[30px]">
+                        <HairlineRule className="md:hidden" inset={34} />
+                        <p className="text-[12.5px] text-[var(--text-secondary)] px-[18px] pt-[18px] pb-2 md:p-0">
+                            Also going
+                        </p>
+                        {alsoGoing.length === 0 ? (
+                            <p className="text-[12px] text-[var(--text-muted)] px-[18px] md:px-0 md:mt-3">
+                                Just the one for now.
+                            </p>
+                        ) : (
+                            <div className="flex flex-col md:mt-[14px]">
+                                {alsoGoing.map(({ series: s, progress: p }) => {
+                                    const onHold = p.status === "on_hold";
+                                    const ep = p.current_episode + 1;
+                                    const done =
+                                        s.total_episodes !== null &&
+                                        p.current_episode >= s.total_episodes;
+                                    return (
+                                        <div
+                                            key={s.id}
+                                            className="tdx-row flex items-center gap-[13px] px-[18px] md:px-0 py-[11px] min-h-[48px]"
+                                        >
+                                            <BigNumber
+                                                size={19}
+                                                tone={onHold ? "dim" : "mute"}
+                                                className="md:hidden w-[34px] leading-none"
+                                            >
+                                                {ep}
+                                            </BigNumber>
+                                            <BigNumber
+                                                size={26}
+                                                tone={onHold ? "dim" : "mute"}
+                                                className="hidden md:inline"
+                                            >
+                                                {ep}
+                                            </BigNumber>
+                                            <div className="flex-1 min-w-0">
+                                                <Link
+                                                    href={`/series/${s.id}`}
+                                                    className={`tdx-focus-ring block rounded-sm text-[13px] md:text-[13px] truncate ${onHold ? "md:text-[var(--text-secondary)]" : ""}`}
+                                                >
+                                                    {s.title}
+                                                </Link>
+                                                {onHold ? (
+                                                    <p className="text-[11px] md:text-[11px] text-[var(--text-secondary)] mt-[3px]">
+                                                        {monthName(
+                                                            p.last_watched_at,
+                                                        )
+                                                            ? `Nothing since ${monthName(p.last_watched_at)}`
+                                                            : "Shelved"}
+                                                    </p>
+                                                ) : (
+                                                    <>
+                                                        <p className="md:hidden text-[11.5px] text-[var(--text-secondary)] mt-[3px]">
+                                                            {p.current_episode} of{" "}
+                                                            {s.total_episodes ??
+                                                                "?"}{" "}
+                                                            · {franchiseFamily(s)}
+                                                            {s.release_year
+                                                                ? ` · ${s.release_year}`
+                                                                : ""}
+                                                        </p>
+                                                        {s.total_episodes ? (
+                                                            <Bar
+                                                                value={
+                                                                    p.current_episode
+                                                                }
+                                                                max={
+                                                                    s.total_episodes
+                                                                }
+                                                                className="hidden md:block mt-[7px]"
+                                                            />
+                                                        ) : null}
+                                                    </>
+                                                )}
+                                            </div>
+                                            {!done && (
+                                                <div className="md:hidden">
+                                                    <QuickLogButton
+                                                        seriesId={s.id}
+                                                        episode={ep}
+                                                        dim={onHold}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {doneLately.length > 0 && (
+                            <div className="hidden md:block">
+                                <HairlineRule className="my-[18px]" />
+                                <p className="text-[12.5px] text-[var(--text-secondary)]">
+                                    Done lately
+                                </p>
+                                <div className="flex flex-col gap-[11px] mt-[13px] text-[13px]">
+                                    {doneLately.map(({ series: s }) => (
+                                        <Link
+                                            key={s.id}
+                                            href={`/series/${s.id}`}
+                                            className="tdx-focus-ring rounded-sm flex items-baseline gap-[9px]"
+                                        >
+                                            <span className="flex-1 min-w-0 truncate">
+                                                {s.title}
+                                            </span>
+                                            <span className="text-[11.5px] text-[var(--accent-primary)]">
+                                                {s.format === "movie"
+                                                    ? "Watched"
+                                                    : s.total_episodes
+                                                      ? `All ${s.total_episodes}`
+                                                      : "Done"}
+                                            </span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </aside>
+                </div>
+            )}
+
+            {items.length > 0 && (
+                <>
+                    <HairlineRule />
+                    <div className="grid md:grid-cols-2">
+                        <div className="md:border-r md:border-[var(--line)]">
+                            <YearChart summary={year} />
+                        </div>
+                        {awards && (
+                            <>
+                                <HairlineRule className="md:hidden" inset={34} />
+                                <CloseToUnlocking view={awards} />
+                            </>
+                        )}
+                    </div>
+                </>
+            )}
+
+            {newTitles.length > 0 && (
+                <>
+                    <HairlineRule />
+                    <NewInDex
+                        titles={newTitles}
+                        addedThisMonth={addedThisMonth ?? 0}
+                        credits={credits}
+                    />
+                </>
+            )}
         </div>
     );
 }

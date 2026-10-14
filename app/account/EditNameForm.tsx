@@ -40,9 +40,10 @@ export default function EditNameForm({ initialName }: { initialName: string }) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
-            <label htmlFor={id} className="text-sm font-medium text-cyan-100/90">
-                Display name
+        <form onSubmit={handleSubmit}>
+            <label htmlFor={id} className="tdx-label">
+                Display name{" "}
+                <span className="tdx-label-hint">shown on shared cards</span>
             </label>
             <div className="flex flex-wrap gap-2">
                 <input
@@ -55,23 +56,23 @@ export default function EditNameForm({ initialName }: { initialName: string }) {
                         setDone(false);
                     }}
                     placeholder="Your name"
-                    className="min-h-[44px] flex-1 min-w-[180px] tdx-field px-3"
+                    className="tdx-field flex-1 min-w-[180px]"
                 />
                 <button
                     type="submit"
                     disabled={saving || name.trim() === initialName.trim()}
-                    className={buttonClasses({ variant: "primary" })}
+                    className={buttonClasses()}
                 >
-                    {saving ? "Saving…" : "Save"}
+                    {saving ? "Saving…" : "Save name"}
                 </button>
             </div>
             {error && (
-                <p role="alert" className="text-sm text-red-300">
+                <p role="alert" className="mt-2 text-xs text-[var(--warning)]">
                     {error}
                 </p>
             )}
             {done && (
-                <p role="status" className="text-sm text-emerald-300">
+                <p role="status" className="mt-2 text-xs text-[var(--success)]">
                     Name updated.
                 </p>
             )}

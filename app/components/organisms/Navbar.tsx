@@ -1,65 +1,96 @@
 import Link from "next/link";
-import Image from "next/image";
+import { MagnifyingGlass } from "@phosphor-icons/react/ssr";
 import { createClient } from "../../../lib/supabase/server";
-import SignOutButton from "../molecules/SignOutButton";
-import tokudexLogo from "../../../assets/tokudex_logo.png";
-import tokudexIcon from "../../../assets/tokudex_icon.png";
+import NavLinks from "../molecules/NavLinks";
+import { buttonClasses } from "../atoms";
+
+function initialsFor(name: string | undefined, email: string | undefined) {
+    const trimmed = name?.trim();
+    if (trimmed) {
+        const parts = trimmed.split(/\s+/);
+        return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+    }
+    return email ? email[0].toUpperCase() : "?";
+}
+
+/** Wordmark draft A — tight tracking, accent on the second half, no mark. */
+export function Wordmark({ size = 18 }: { size?: number }) {
+    return (
+        <span
+            className="font-semibold tracking-[-0.035em] leading-none"
+            style={{ fontSize: size }}
+            aria-label="TokuDex"
+        >
+            Toku
+            <span className="text-[var(--accent-primary)]">Dex</span>
+        </span>
+    );
+}
 
 export default async function Navbar() {
     const supabase = await createClient();
     const {
         data: { user },
     } = await supabase.auth.getUser();
+    let logged = 0;
+    if (user) {
+        const { data } = await supabase
+            .from("user_series_progress")
+            .select("current_episode")
+            .eq("user_id", user.id);
+        logged = (data ?? []).reduce(
+            (n, r) => n + (r.current_episode ?? 0),
+            0,
+        );
+    }
 
     return (
-        <nav className="ios-safe-top sticky top-0 z-30 border-b border-cyan-950/70 bg-[#12202f]/85 backdrop-blur-xl">
-            <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-                <Link href="/" className="flex items-center gap-2.5">
-                    <Image
-                        src={tokudexLogo}
-                        alt="TokuDex"
-                        priority
-                        className="h-8 md:h-9 w-auto"
-                    />
-                    <span className="hidden sm:inline border-l border-cyan-900/60 pl-2.5 text-[11px] uppercase tracking-[0.2em] text-cyan-200/75">
-                        Episode Tracker
-                    </span>
+        <nav className="ios-safe-top sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--background)]">
+            <div className="w-full px-[18px] sm:px-[30px] py-[14px] md:py-[15px] flex items-center gap-4 md:gap-[22px]">
+                <Link href="/" className="tdx-focus-ring rounded-sm">
+                    <Wordmark />
                 </Link>
 
-                <div className="hidden md:flex items-center gap-5 text-sm text-cyan-100/75">
-                    <Link href="/" className="hover:text-cyan-300 transition-colors">Home</Link>
-                    <Link href="/series" className="hover:text-cyan-300 transition-colors">Series</Link>
-                    {user && (
-                        <Link href="/achievements" className="hover:text-cyan-300 transition-colors">
-                            Achievements
-                        </Link>
-                    )}
-                    {user && (
-                        <Link href="/account" className="hover:text-cyan-300 transition-colors">
-                            Account
-                        </Link>
-                    )}
-                </div>
+                <NavLinks />
 
-                <div className="flex items-center gap-3">
+                <div className="ml-auto flex items-center gap-4 text-[12.5px] text-[var(--text-secondary)]">
+                    <Link
+                        href="/community/catalog"
+                        aria-label="Search the catalog"
+                        className="tdx-focus-ring rounded-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                        <MagnifyingGlass size={18} aria-hidden />
+                    </Link>
                     {user ? (
                         <>
+                            <span className="hidden sm:inline tabular-nums">
+                                {logged.toLocaleString()} logged
+                            </span>
                             <Link
                                 href="/account"
                                 aria-label="Account"
-                                className="tdx-focus-ring h-9 w-9 rounded-full border border-cyan-700/50 bg-[#081a2b] flex items-center justify-center overflow-hidden hover:border-cyan-400/60 transition-colors"
+                                className="tdx-focus-ring h-[26px] w-[26px] rounded-full bg-[var(--sunk)] text-[var(--text-secondary)] grid place-items-center text-[10.5px] hover:text-[var(--text-primary)] transition-colors"
                             >
-                                <Image src={tokudexIcon} alt="" className="w-5 h-5 opacity-85" />
+                                {initialsFor(
+                                    user.user_metadata?.full_name as
+                                        | string
+                                        | undefined,
+                                    user.email,
+                                )}
                             </Link>
-                            <SignOutButton className="text-cyan-100/75 hover:text-cyan-300 text-sm" />
                         </>
                     ) : (
-                        <Link
-                            href="/login"
-                            className="text-sm rounded-lg bg-cyan-500/90 text-[#031018] px-3 py-1.5 font-semibold hover:bg-cyan-400 transition-colors"
-                        >
-                            Sign in
-                        </Link>
+                        <>
+                            <span className="tdx-chip hidden sm:inline-flex">
+                                Guest
+                            </span>
+                            <Link
+                                href="/login"
+                                className={buttonClasses({ size: "sm" })}
+                            >
+                                Sign in
+                            </Link>
+                        </>
                     )}
                 </div>
             </div>

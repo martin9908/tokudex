@@ -5,3 +5,7 @@ export { default as ProgressBar } from "./ProgressBar";
 export { default as Card } from "./Card";
 export { default as PosterImage } from "./PosterImage";
 export { buttonClasses, type ButtonVariant, type ButtonSize } from "./buttonStyles";
+export { default as BigNumber } from "./BigNumber";
+export { default as HairlineRule } from "./HairlineRule";
+export { default as Bar } from "./Bar";
+export { default as TagChip } from "./TagChip";

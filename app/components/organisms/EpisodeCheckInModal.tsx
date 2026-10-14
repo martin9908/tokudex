@@ -1,75 +1,83 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveEpisodeCheckIn } from "../../actions";
-import { NOTE_MAX_LENGTH } from "@/lib/validation";
-import { buttonClasses } from "../atoms";
-
-type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
+import type { ProgressStatus } from "@/lib/validation";
+import CheckInForm from "./CheckInForm";
 
 type EpisodeCheckInModalProps = {
     open: boolean;
+    initialNote?: string;
+    initialStatus?: ProgressStatus;
     seriesId: string;
     seriesTitle: string;
+    totalEpisodes?: number | null;
     episodeNumber: number;
     episodeTitle?: string | null;
     episodeSynopsis?: string | null;
+    episodeType?: string | null;
+    episodesLogged?: number | null;
     onClose: () => void;
     onSaved?: () => void;
 };
 
+/**
+ * Episode check-in sheet: status + note saved in one transaction with the
+ * progress update. Slides up from the bottom on phones and sits centred on
+ * larger screens.
+ */
 export default function EpisodeCheckInModal({
     open,
+    initialNote = "",
+    initialStatus = "watching",
     seriesId,
     seriesTitle,
+    totalEpisodes,
     episodeNumber,
     episodeTitle,
     episodeSynopsis,
+    episodeType,
+    episodesLogged,
     onClose,
     onSaved,
 }: EpisodeCheckInModalProps) {
     const router = useRouter();
-    const noteId = useId();
-    const statusId = useId();
-
-    const [note, setNote] = useState("");
-    const [status, setStatus] = useState<ProgressStatus>("watching");
+    const [note, setNote] = useState(initialNote);
+    const [status, setStatus] = useState<ProgressStatus>(initialStatus);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!open) return;
-
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
-
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape" && !saving) onClose();
         };
-
         document.addEventListener("keydown", onKeyDown);
-
         return () => {
             document.body.style.overflow = previousOverflow;
             document.removeEventListener("keydown", onKeyDown);
         };
     }, [open, onClose, saving]);
 
-    async function handleSave() {
+    async function handleSave(alsoNext: boolean) {
         if (saving) return;
-
         try {
             setSaving(true);
             setError(null);
-
             await saveEpisodeCheckIn(seriesId, episodeNumber, status, note);
+            if (alsoNext)
+                await saveEpisodeCheckIn(seriesId, episodeNumber + 1, status, "");
             router.refresh();
             onSaved?.();
             onClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to save check-in");
+            setError(
+                err instanceof Error ? err.message : "That check-in didn't save",
+            );
             setSaving(false);
         }
     }
@@ -78,128 +86,39 @@ export default function EpisodeCheckInModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#01060dcc] backdrop-blur-sm p-0 sm:p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[var(--shade)] p-0 sm:p-4"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="episode-check-in-title"
+            aria-label={`Log episode ${episodeNumber} of ${seriesTitle}`}
             onClick={saving ? undefined : onClose}
         >
             <div
-                className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-cyan-900/45 bg-[#12202f]/95 p-4 sm:p-5"
+                className="w-full sm:max-w-[560px] max-h-[92vh] overflow-y-auto rounded-t-xl sm:rounded-lg border border-[var(--line)] bg-[var(--background)] px-[22px] sm:px-[28px] pt-[18px] sm:pt-[22px] pb-[26px]"
                 onClick={(event) => event.stopPropagation()}
             >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/70 mb-1">
-                            Episode Check-in
-                        </p>
-                        <h2 id="episode-check-in-title" className="text-2xl font-bold leading-tight">
-                            {seriesTitle}
-                        </h2>
-                        <p className="text-cyan-100/75 text-sm mt-1">
-                            Episode {episodeNumber}
-                            {episodeTitle ? ` · ${episodeTitle}` : ""}
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={saving}
-                        className="tdx-focus-ring rounded-lg border border-cyan-900/60 px-2 py-1 text-sm text-cyan-100 hover:bg-cyan-500/10 disabled:opacity-50"
-                        aria-label="Close episode check-in"
-                    >
-                        Close
-                    </button>
-                </div>
-
-                {error && (
-                    <p className="mb-4 rounded-xl border border-red-900/45 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                        {error}
-                    </p>
-                )}
-
-                <p className="mb-4 text-sm text-cyan-100/70">
-                    Mark how far you&apos;ve watched and jot a recap so you remember what happened next time.
-                </p>
-
-                {episodeSynopsis && (
-                    <div className="mb-4 rounded-xl border border-cyan-900/50 bg-[#081a2b]/70 p-3">
-                        <p className="text-[11px] uppercase tracking-wider text-cyan-300/70 mb-1">
-                            Episode recap
-                        </p>
-                        <p className="text-sm text-cyan-100/85 leading-relaxed">{episodeSynopsis}</p>
-                    </div>
-                )}
-
-                <div className="space-y-4">
-                    <div>
-                        <label htmlFor={noteId} className="text-sm font-medium text-cyan-100/90 block mb-2">
-                            Quick recap note
-                        </label>
-                        <textarea
-                            id={noteId}
-                            rows={4}
-                            value={note}
-                            maxLength={NOTE_MAX_LENGTH}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="What happened in this episode?"
-                            className="tdx-field px-3 py-2.5"
-                        />
-                        <p className="mt-1 text-right text-xs text-cyan-200/75">
-                            {note.length}/{NOTE_MAX_LENGTH}
-                        </p>
-                    </div>
-
-                    <div>
-                        <label htmlFor={statusId} className="text-sm font-medium text-cyan-100/90 block mb-2">
-                            Status
-                        </label>
-                        <div className="relative">
-                            <select
-                                id={statusId}
-                                value={status}
-                                onChange={(e) => setStatus(e.target.value as ProgressStatus)}
-                                className="tdx-field appearance-none px-3 py-2.5 pr-10"
-                            >
-                                <option value="watching">Watching</option>
-                                <option value="completed">Completed</option>
-                                <option value="on_hold">On Hold</option>
-                                <option value="plan_to_watch">Plan to Watch</option>
-                            </select>
-                            <svg
-                                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-300"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                aria-hidden
-                            >
-                                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={saving}
-                        className={buttonClasses({ variant: "secondary", className: "flex-1 min-w-[150px]" })}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving}
-                        className={buttonClasses({ variant: "primary", className: "flex-1 min-w-[150px]" })}
-                    >
-                        {saving ? "Saving..." : "Save and Mark Watched"}
-                    </button>
-                </div>
+                <div
+                    aria-hidden
+                    className="sm:hidden mx-auto mb-3.5 h-1 w-9 rounded-[2px] bg-[var(--line)]"
+                />
+                <CheckInForm
+                    seriesTitle={seriesTitle}
+                    episodeNumber={episodeNumber}
+                    totalEpisodes={totalEpisodes}
+                    episodeTitle={episodeTitle}
+                    episodeSynopsis={episodeSynopsis}
+                    episodeType={episodeType}
+                    note={note}
+                    onNoteChange={setNote}
+                    status={status}
+                    onStatusChange={setStatus}
+                    saving={saving}
+                    error={error}
+                    onSave={handleSave}
+                    onCancel={onClose}
+                    episodesLogged={episodesLogged}
+                />
             </div>
         </div>,
-        document.body
+        document.body,
     );
 }

@@ -1,195 +1,65 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncAchievements } from "@/lib/achievementState";
-import { trackServer } from "@/lib/analytics";
 import { buildSnapshotFor, generateShareSlug } from "@/lib/share";
-import { isUuid, PROGRESS_STATUSES, NOTE_MAX_LENGTH } from "@/lib/validation";
+import type { ProgressStatus } from "@/lib/validation";
+import { saveTracking, saveEpisodeNote } from "@/lib/tracking";
 
-type ProgressStatus = "watching" | "completed" | "on_hold" | "plan_to_watch";
-
-function statusForProgress(currentEpisode: number, totalEpisodes: number | null): ProgressStatus {
-    if (currentEpisode <= 0) return "plan_to_watch";
-    if (totalEpisodes && currentEpisode >= totalEpisodes) return "completed";
-    return "watching";
-}
-
-/**
- * Mark a series watched up to (and including) `episode`. Passing 0 resets the
- * series to "not started". Persists to user_series_progress and refreshes the
- * pages that render progress.
- */
 export async function setEpisodeProgress(seriesId: string, episode: number) {
-    if (!isUuid(seriesId)) throw new Error("Invalid series id");
-    if (!Number.isInteger(episode) || episode < 0) {
-        throw new Error("Invalid episode number");
-    }
-
-    const client = await createClient();
-    const {
-        data: { user },
-    } = await client.auth.getUser();
-
-    if (!user) throw new Error("Unauthorized");
-
-    // Clamp against the series' real episode count.
-    const { data: series } = await client
-        .from("series")
-        .select("total_episodes")
-        .eq("id", seriesId)
-        .single();
-
-    const total = series?.total_episodes ?? null;
-    const current = Math.max(0, total ? Math.min(episode, total) : episode);
-
-    const { error } = await client.from("user_series_progress").upsert(
-        {
-            user_id: user.id,
-            series_id: seriesId,
-            current_episode: current,
-            status: statusForProgress(current, total),
-            last_watched_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,series_id" }
-    );
-
-    if (error) throw new Error(error.message);
-
-    await syncAchievements();
-
-    await trackServer("log_episode", { seriesId, episode: current });
-    if (total && current >= total) {
-        await trackServer("mark_done", { seriesId });
-    }
-
-    revalidatePath(`/series/${seriesId}`);
-    revalidatePath("/series");
-    revalidatePath("/");
-
-    return { currentEpisode: current };
+    const data = await saveTracking({ seriesId, episode });
+    return { currentEpisode: data.current_episode };
 }
-
-/**
- * Add a series to the signed-in user's tracker without starting it. No-op if
- * the user already tracks the series.
- */
 export async function addSeriesToTracker(seriesId: string) {
-    if (!isUuid(seriesId)) throw new Error("Invalid series id");
-
-    const client = await createClient();
-    const {
-        data: { user },
-    } = await client.auth.getUser();
-
-    if (!user) throw new Error("Unauthorized");
-
-    const { error } = await client.from("user_series_progress").upsert(
-        {
-            user_id: user.id,
-            series_id: seriesId,
-            current_episode: 0,
-            status: "plan_to_watch",
-            last_watched_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,series_id", ignoreDuplicates: true }
-    );
-
-    if (error) throw new Error(error.message);
-
-    await syncAchievements();
-
-    await trackServer("add_to_tracker", { seriesId });
-
-    revalidatePath(`/series/${seriesId}`);
-    revalidatePath("/series");
-    revalidatePath("/");
+    await saveTracking({
+        seriesId,
+        episode: 0,
+        status: "plan_to_watch",
+        addOnly: true,
+    });
 }
-
-/**
- * Episode check-in: record progress for `episodeNumber` (with an explicit
- * status) and, optionally, save a recap note — in a single server round-trip.
- * Both writes are idempotent upserts, so if one fails the user can simply retry
- * and the partial state heals (no orphaned half-save as with two separate fetches).
- */
+export async function setSeriesStatus(
+    seriesId: string,
+    currentEpisode: number,
+    status: ProgressStatus,
+) {
+    await saveTracking({ seriesId, episode: currentEpisode, status });
+}
 export async function saveEpisodeCheckIn(
     seriesId: string,
     episodeNumber: number,
     status: ProgressStatus,
-    note: string
+    note: string,
 ) {
-    if (!isUuid(seriesId)) throw new Error("Invalid series id");
-    if (!Number.isInteger(episodeNumber) || episodeNumber < 1) {
+    if (!Number.isInteger(episodeNumber) || episodeNumber < 1)
         throw new Error("Invalid episode number");
-    }
-    if (!PROGRESS_STATUSES.includes(status)) throw new Error("Invalid status");
-
-    const trimmedNote = note.trim();
-    if (trimmedNote.length > NOTE_MAX_LENGTH) {
-        throw new Error(`Note must be ${NOTE_MAX_LENGTH} characters or fewer`);
-    }
-
-    const client = await createClient();
-    const {
-        data: { user },
-    } = await client.auth.getUser();
-
-    if (!user) throw new Error("Unauthorized");
-
-    // Clamp against the series' real episode count.
-    const { data: series } = await client
-        .from("series")
-        .select("total_episodes")
-        .eq("id", seriesId)
-        .single();
-
-    const total = series?.total_episodes ?? null;
-    const current = total ? Math.min(episodeNumber, total) : episodeNumber;
-
-    const now = new Date().toISOString();
-
-    const { error: progressError } = await client.from("user_series_progress").upsert(
-        {
-            user_id: user.id,
-            series_id: seriesId,
-            current_episode: current,
-            status,
-            last_watched_at: now,
-            updated_at: now,
-        },
-        { onConflict: "user_id,series_id" }
-    );
-
-    if (progressError) throw new Error(progressError.message);
-
-    if (trimmedNote) {
-        const { error: noteError } = await client.from("episode_notes").upsert(
-            {
-                user_id: user.id,
-                series_id: seriesId,
-                episode_number: episodeNumber,
-                note: trimmedNote,
-                created_at: now,
-            },
-            { onConflict: "user_id,series_id,episode_number" }
-        );
-
-        if (noteError) throw new Error(noteError.message);
-    }
-
-    await syncAchievements();
-
-    await trackServer("log_episode", { seriesId, episode: current, status });
-    if (status === "completed") {
-        await trackServer("mark_done", { seriesId });
-    }
-
-    revalidatePath(`/series/${seriesId}`);
-    revalidatePath("/series");
-    revalidatePath("/");
+    await saveTracking({
+        seriesId,
+        episode: episodeNumber,
+        status,
+        note,
+        noteEpisode: episodeNumber,
+    });
+}
+/** Flip a movie between watched and plan-to-watch without touching its note. */
+export async function setMovieWatched(seriesId: string, watched: boolean) {
+    await saveTracking({
+        seriesId,
+        episode: watched ? 1 : 0,
+        status: watched ? "completed" : "plan_to_watch",
+    });
+}
+export async function saveMovieProgress(
+    seriesId: string,
+    watched: boolean,
+    note: string,
+) {
+    await saveTracking({
+        seriesId,
+        episode: watched ? 1 : 0,
+        status: watched ? "completed" : "plan_to_watch",
+        note,
+    });
 }
 
 /**
@@ -198,7 +68,9 @@ export async function saveEpisodeCheckIn(
  * server-side so a user can't mint a card for something they haven't earned.
  * Returns the opaque slug for the public /share/[slug] URL.
  */
-export async function createShareCard(shareKey: string): Promise<{ slug: string }> {
+export async function createShareCard(
+    shareKey: string,
+): Promise<{ slug: string }> {
     const client = await createClient();
     const {
         data: { user },
@@ -218,7 +90,8 @@ export async function createShareCard(shareKey: string): Promise<{ slug: string 
     if (existing?.slug) return { slug: existing.slug };
 
     const displayName =
-        (user.user_metadata?.full_name as string | undefined)?.trim() || "A TokuDex fan";
+        (user.user_metadata?.full_name as string | undefined)?.trim() ||
+        "A TokuDex fan";
     const slug = generateShareSlug();
 
     const { error } = await client.from("share_cards").insert({
@@ -254,5 +127,70 @@ export async function deleteAccount() {
 
     const admin = createAdminClient();
     const { error } = await admin.auth.admin.deleteUser(user.id);
+    if (error) throw new Error(error.message);
+}
+
+/** Episodes logged across tokusatsu series — the number ranks are keyed off. */
+export async function getRankProgress(): Promise<{ logged: number } | null> {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) return null;
+    const { data } = await client
+        .from("user_series_progress")
+        .select("current_episode, series(category, format)")
+        .eq("user_id", user.id);
+    const logged = (
+        (data ?? []) as unknown as {
+            current_episode: number | null;
+            series: { category: string; format: string } | null;
+        }[]
+    ).reduce(
+        (n, r) =>
+            r.series?.category === "tokusatsu" && r.series.format === "series"
+                ? n + (r.current_episode ?? 0)
+                : n,
+        0,
+    );
+    return { logged };
+}
+
+/** Save or replace the private note on one logged episode without touching progress. */
+export async function saveNote(seriesId: string, episode: number, note: string) {
+    if (!Number.isInteger(episode) || episode < 1)
+        throw new Error("Invalid episode number");
+    await saveEpisodeNote(seriesId, episode, note);
+}
+
+/** Weekly recap preference. Nothing is emailed yet; the choice is kept for when it is. */
+export async function setWeeklyRecap(enabled: boolean) {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+    const { error } = await client.from("notification_prefs").upsert(
+        { user_id: user.id, weekly_recap: enabled, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" },
+    );
+    if (error) throw new Error("Could not save that preference.");
+}
+
+/** Public handle and whether your logging shows in the community feed. */
+export async function saveProfile(input: {
+    handle: string;
+    shareActivity: boolean;
+}) {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+    const { error } = await client.rpc("set_profile", {
+        p_handle: input.handle.trim().toLowerCase(),
+        p_display: null,
+        p_share_activity: input.shareActivity,
+    });
     if (error) throw new Error(error.message);
 }

@@ -41,19 +41,19 @@ export default function ResetPasswordPage() {
         router.refresh();
     }
 
-    const inputClass = "min-h-[44px] tdx-field px-3";
-
     return (
-        <div className="flex flex-1 items-center justify-center px-4 py-16">
-            <div className="w-full max-w-sm tdx-panel p-6">
-                <h1 className="text-2xl font-semibold tracking-tight mb-1">Set a new password</h1>
-                <p className="text-sm text-cyan-200/70 mb-6">
-                    Choose a new password for your TokuDex account.
+        <div className="flex flex-1 items-center justify-center px-4 py-10 sm:py-16 pb-24">
+            <div className="w-full max-w-[372px] tdx-panel p-6">
+                <p className="tdx-eyebrow">Reset password</p>
+                <h1 className="text-[17px] font-medium mt-1.5">Set a new password</h1>
+                <p className="text-[12.5px] leading-[1.55] text-[var(--text-secondary)] mt-2 mb-4">
+                    You opened this from the reset link in your email.
                 </p>
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor={pwId} className="text-sm font-medium text-cyan-100/90">
-                            New password
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                    <div>
+                        <label htmlFor={pwId} className="tdx-label">
+                            New password{" "}
+                            <span className="tdx-label-hint">at least 8 characters</span>
                         </label>
                         <input
                             id={pwId}
@@ -61,12 +61,12 @@ export default function ResetPasswordPage() {
                             autoComplete="new-password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className={inputClass}
+                            className="tdx-field"
                             placeholder="••••••••"
                         />
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor={confirmId} className="text-sm font-medium text-cyan-100/90">
+                    <div>
+                        <label htmlFor={confirmId} className="tdx-label">
                             Confirm new password
                         </label>
                         <input
@@ -75,13 +75,13 @@ export default function ResetPasswordPage() {
                             autoComplete="new-password"
                             value={confirm}
                             onChange={(e) => setConfirm(e.target.value)}
-                            className={inputClass}
+                            className="tdx-field"
                             placeholder="••••••••"
                         />
                     </div>
 
                     {error && (
-                        <p role="alert" className="text-sm text-red-300">
+                        <p role="alert" className="tdx-callout tdx-callout-warn text-xs">
                             {error}
                         </p>
                     )}
@@ -89,9 +89,9 @@ export default function ResetPasswordPage() {
                     <button
                         type="submit"
                         disabled={saving}
-                        className={buttonClasses({ variant: "primary", className: "mt-1 px-5" })}
+                        className={buttonClasses({ size: "lg", className: "mt-1 w-full min-h-[44px]" })}
                     >
-                        {saving ? "Saving…" : "Update password"}
+                        {saving ? "Saving…" : "Save password"}
                     </button>
                 </form>
             </div>

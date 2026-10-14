@@ -43,13 +43,12 @@ export default function ChangePasswordForm() {
         setDone(true);
     }
 
-    const inputClass = "min-h-[44px] tdx-field px-3";
-
     return (
-        <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="flex flex-col gap-1.5">
-                <label htmlFor={pwId} className="text-sm font-medium text-cyan-100/90">
-                    New password
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div>
+                <label htmlFor={pwId} className="tdx-label">
+                    New password{" "}
+                    <span className="tdx-label-hint">at least 8 characters</span>
                 </label>
                 <input
                     id={pwId}
@@ -57,12 +56,12 @@ export default function ChangePasswordForm() {
                     autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={inputClass}
+                    className="tdx-field"
                     placeholder="••••••••"
                 />
             </div>
-            <div className="flex flex-col gap-1.5">
-                <label htmlFor={confirmId} className="text-sm font-medium text-cyan-100/90">
+            <div>
+                <label htmlFor={confirmId} className="tdx-label">
                     Confirm new password
                 </label>
                 <input
@@ -71,18 +70,18 @@ export default function ChangePasswordForm() {
                     autoComplete="new-password"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
-                    className={inputClass}
+                    className="tdx-field"
                     placeholder="••••••••"
                 />
             </div>
 
             {error && (
-                <p role="alert" className="text-sm text-red-300">
+                <p role="alert" className="text-xs text-[var(--warning)]">
                     {error}
                 </p>
             )}
             {done && (
-                <p role="status" className="text-sm text-emerald-300">
+                <p role="status" className="text-xs text-[var(--success)]">
                     Password updated.
                 </p>
             )}
@@ -90,7 +89,7 @@ export default function ChangePasswordForm() {
             <button
                 type="submit"
                 disabled={saving}
-                className={buttonClasses({ variant: "primary", className: "px-5" })}
+                className={buttonClasses({ className: "self-start" })}
             >
                 {saving ? "Saving…" : "Update password"}
             </button>

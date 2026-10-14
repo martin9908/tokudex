@@ -1,3 +1,4 @@
+import { saveTracking, TrackingInputError } from "@/lib/tracking";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { validateProgressInput } from "@/lib/validation";
@@ -15,36 +16,40 @@ export async function POST(request: NextRequest) {
         } = await client.auth.getUser();
 
         if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 },
+            );
         }
 
         const validation = validateProgressInput(await request.json());
         if (!validation.ok) {
-            return NextResponse.json({ error: validation.error }, { status: 400 });
+            return NextResponse.json(
+                { error: validation.error },
+                { status: 400 },
+            );
         }
         const { seriesId, currentEpisode, status } = validation.value;
 
-        const { data, error } = await client
-            .from("user_series_progress")
-            .upsert(
-                {
-                    user_id: user.id,
-                    series_id: seriesId,
-                    current_episode: currentEpisode,
-                    status: status,
-                    last_watched_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                },
-                { onConflict: "user_id,series_id" }
-            )
-            .select()
-            .single();
-
-        if (error) throw error;
+        const data = await saveTracking({
+            seriesId,
+            episode: currentEpisode,
+            status,
+        });
 
         return NextResponse.json(data);
     } catch (error) {
-        console.error("Error updating progress:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        if (error instanceof TrackingInputError)
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        if (error instanceof SyntaxError)
+            return NextResponse.json(
+                { error: "Invalid JSON" },
+                { status: 400 },
+            );
+        console.error("progress_write_failed");
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500 },
+        );
     }
 }
