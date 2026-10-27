@@ -570,7 +570,7 @@ export default async function Home() {
                                     Done lately
                                 </p>
                                 <div className="flex flex-col gap-[11px] mt-[13px] text-[13px]">
-                                    {doneLately.map(({ series: s }) => (
+                                    {doneLately.map(({ series: s, progress: p }) => (
                                         <Link
                                             key={s.id}
                                             href={`/series/${s.id}`}
@@ -582,9 +582,12 @@ export default async function Home() {
                                             <span className="text-[11.5px] text-[var(--accent-primary)]">
                                                 {s.format === "movie"
                                                     ? "Watched"
-                                                    : s.total_episodes
-                                                      ? `All ${s.total_episodes}`
-                                                      : "Done"}
+                                                    : s.total_episodes &&
+                                                        p.current_episode < s.total_episodes
+                                                      ? `${p.current_episode} of ${s.total_episodes}`
+                                                      : s.total_episodes
+                                                        ? `All ${s.total_episodes}`
+                                                        : "Done"}
                                             </span>
                                         </Link>
                                     ))}

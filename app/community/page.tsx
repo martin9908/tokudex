@@ -46,7 +46,10 @@ function subline(row: ActivityRow) {
     const total = row.series?.total_episodes;
     switch (row.kind) {
         case "finished":
-            return `${row.series?.format === "movie" ? "Watched" : total ? `All ${total}` : "Done"} · ${when}`;
+            // A member can mark a series finished before its last episode.
+            if (row.series?.format === "movie") return `Watched · ${when}`;
+            if (total && row.episode && row.episode < total) return `${row.episode} of ${total} · ${when}`;
+            return `${total ? `All ${total}` : "Done"} · ${when}`;
         case "shelved":
             return `${row.episode ?? 0} of ${total ?? "?"} · ${when}`;
         case "added":
@@ -59,7 +62,7 @@ function subline(row: ActivityRow) {
 
 function bigNumber(row: ActivityRow) {
     if (row.kind === "finished")
-        return row.series?.format === "movie" ? 1 : (row.series?.total_episodes ?? row.episode ?? 1);
+        return row.series?.format === "movie" ? 1 : (row.episode ?? row.series?.total_episodes ?? 1);
     if (row.kind === "added" || row.kind === "corrected") return 1;
     return row.episode ?? 0;
 }
