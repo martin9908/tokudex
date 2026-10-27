@@ -17,7 +17,7 @@ export const SITE_URL = (
 export const SITE_NAME = "TokuDex";
 
 export const SITE_DESCRIPTION =
-    "Track which tokusatsu episode you're on and what happened last. TokuDex is an episode tracker — it does not stream video.";
+    "Track tokusatsu, anime, and movies. Save private recaps, contribute missing titles, and discover community favorites. TokuDex does not stream video.";
 
 /** Build an absolute URL from a site-relative path. */
 export function absoluteUrl(path = "/"): string {
@@ -33,7 +33,10 @@ export function seriesUrl(id: string): string {
 }
 
 /** Trim text to a clean meta-description length, stripping newlines. */
-export function truncateDescription(text: string | null | undefined, max = 155): string {
+export function truncateDescription(
+    text: string | null | undefined,
+    max = 155,
+): string {
     if (!text) return "";
     const clean = text.replace(/\s+/g, " ").trim();
     if (clean.length <= max) return clean;
@@ -44,6 +47,7 @@ type SeriesLike = {
     title: string;
     franchise?: string | null;
     total_episodes?: number | null;
+    format?: string;
     synopsis?: string | null;
 };
 
@@ -52,8 +56,11 @@ export function seriesMetaDescription(series: SeriesLike): string {
     if (series.synopsis) return truncateDescription(series.synopsis);
     const parts = [series.title];
     if (series.franchise) parts.push(`(${series.franchise})`);
-    const episodes = series.total_episodes ? ` — ${series.total_episodes} episodes` : "";
+    const episodes =
+        series.format !== "movie" && series.total_episodes
+            ? ` — ${series.total_episodes} episodes`
+            : "";
     return truncateDescription(
-        `Track your progress through ${parts.join(" ")}${episodes} on ${SITE_NAME}.`
+        `Track your progress through ${parts.join(" ")}${episodes} on ${SITE_NAME}.`,
     );
 }

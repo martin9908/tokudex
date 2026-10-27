@@ -21,7 +21,9 @@
 /build
 
 # misc
-docs/
+docs/*
+!docs/community-release.md
+!docs/mobile-direction.md
 .DS_Store
 *.pem
 
@@ -41,3 +43,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local validation artifacts
+.next-test/
+playwright-report/
+test-results/

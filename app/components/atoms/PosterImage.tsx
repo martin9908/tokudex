@@ -1,50 +1,58 @@
 import Image from "next/image";
-import type { StaticImageData } from "next/image";
-import tokudexIcon from "../../../assets/tokudex_icon.png";
 
 interface PosterImageProps {
-    /** Cover art URL. When absent, the TokuDex icon is shown as a fallback. */
+    /** Cover art URL. When absent, a dashed "Poster pending" tile is shown. */
     src?: string | null;
     alt: string;
     /** Responsive `sizes` hint for the fill image. */
     sizes?: string;
     /** Extra classes for the cover image (object-position, scale, etc.). */
     imageClassName?: string;
-    /** Sizing/opacity classes for the fallback icon. */
-    iconClassName?: string;
-    /** Optional fallback icon (defaults to the TokuDex mark). */
-    fallbackIcon?: StaticImageData;
-    /** Render a subtle bottom gradient over the cover. */
-    overlay?: boolean;
+    /** Text inside the placeholder tile. */
+    pendingLabel?: React.ReactNode;
+    /** Extra classes for the placeholder tile (font size, padding). */
+    pendingClassName?: string;
+    /** Pass "eager" for above-the-fold heroes that can be the LCP element. */
+    loading?: "lazy" | "eager";
 }
 
 /**
  * Renders cover art inside a sized `relative overflow-hidden` frame provided by
- * the parent, falling back to the TokuDex icon when no cover exists. This is the
- * single source of truth for the "poster or placeholder" pattern used across
- * cards, heroes, and lists.
+ * the parent. Titles without approved art get the dashed placeholder — the
+ * catalog never shows a substitute image, so "no poster yet" is legible at a
+ * glance. This is the single source of truth for the poster-or-placeholder
+ * pattern used across cards, heroes, and lists.
  */
 export default function PosterImage({
     src,
     alt,
     sizes = "(max-width: 768px) 45vw, 220px",
     imageClassName = "object-cover object-center",
-    iconClassName = "h-16 w-16 opacity-80",
-    fallbackIcon = tokudexIcon,
-    overlay = false,
+    pendingLabel = "Poster pending",
+    pendingClassName = "",
+    loading,
 }: PosterImageProps) {
+    if (src) {
+        return (
+            <Image
+                src={src}
+                alt={alt}
+                fill
+                sizes={sizes}
+                loading={loading}
+                className={imageClassName}
+            />
+        );
+    }
     return (
-        <>
-            {src ? (
-                <Image src={src} alt={alt} fill sizes={sizes} className={imageClassName} />
-            ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                    <Image src={fallbackIcon} alt={alt} className={iconClassName} />
-                </div>
-            )}
-            {overlay && (
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,9,19,0.08)_0%,rgba(2,9,19,0.22)_60%,rgba(2,9,19,0.42)_100%)]" />
-            )}
-        </>
+        <div
+            role="img"
+            aria-label={`${alt} — poster pending`}
+            className={`tdx-poster-pending absolute inset-0 rounded-none border-0 ${pendingClassName}`}
+        >
+            <span className="rounded-md border border-dashed border-[var(--line)] px-2 py-1.5 leading-tight">
+                {pendingLabel}
+            </span>
+        </div>
     );
 }
