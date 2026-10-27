@@ -9,6 +9,7 @@ import SupportLink from "../components/molecules/SupportLink";
 import ThemeToggle from "../components/molecules/ThemeToggle";
 import EditNameForm from "./EditNameForm";
 import ProfileForm from "./ProfileForm";
+import ShareActivityToggle from "./ShareActivityToggle";
 import { ensureProfile } from "@/lib/profiles";
 import ChangePasswordForm from "./ChangePasswordForm";
 import DeleteAccountButton from "./DeleteAccountButton";
@@ -51,7 +52,7 @@ export default async function AccountPage() {
                 <EditNameForm initialName={fullName ?? ""} />
                 <ProfileForm
                     initialHandle={profile?.handle ?? ""}
-                    initialShare={profile?.share_activity ?? true}
+                    share={profile?.share_activity ?? true}
                 />
                 <div className="flex items-center justify-between gap-3 mt-3 text-[12.5px]">
                     <span className="text-[var(--text-secondary)]">Email</span>
@@ -60,6 +61,11 @@ export default async function AccountPage() {
                 <div className="mt-3.5">
                     <SignOutButton className={buttonClasses({ variant: "secondary" })} />
                 </div>
+            </section>
+
+            <section id="sharing" className="tdx-panel p-4 mt-3.5 scroll-mt-20">
+                <h2 className="text-sm font-medium mb-3">Community sharing</h2>
+                <ShareActivityToggle initialShare={profile?.share_activity ?? true} />
             </section>
 
             <section className="tdx-panel p-4 mt-3.5">

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildSnapshotFor, generateShareSlug } from "@/lib/share";
 import type { ProgressStatus } from "@/lib/validation";
 import { saveTracking, saveEpisodeNote } from "@/lib/tracking";
+import { getProfile } from "@/lib/profiles";
 
 export async function setEpisodeProgress(seriesId: string, episode: number) {
     const data = await saveTracking({ seriesId, episode });
@@ -191,6 +192,23 @@ export async function saveProfile(input: {
         p_handle: input.handle.trim().toLowerCase(),
         p_display: null,
         p_share_activity: input.shareActivity,
+    });
+    if (error) throw new Error(error.message);
+}
+
+/** Just the community-feed switch; keeps the member's current handle. */
+export async function saveShareActivity(shareActivity: boolean) {
+    const client = await createClient();
+    const {
+        data: { user },
+    } = await client.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+    const profile = await getProfile(user.id);
+    if (!profile) throw new Error("Set a handle first.");
+    const { error } = await client.rpc("set_profile", {
+        p_handle: profile.handle,
+        p_display: null,
+        p_share_activity: shareActivity,
     });
     if (error) throw new Error(error.message);
 }
