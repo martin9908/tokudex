@@ -5,18 +5,18 @@ import { useRouter } from "next/navigation";
 import { saveProfile } from "../actions";
 import { buttonClasses } from "../components/atoms";
 
-/** Public handle + the switch that puts your logging in the community feed. */
+/** Public handle. Sharing has its own switch (ShareActivityToggle). */
 export default function ProfileForm({
     initialHandle,
-    initialShare,
+    share,
 }: {
     initialHandle: string;
-    initialShare: boolean;
+    /** Current sharing setting, passed through unchanged when the handle saves. */
+    share: boolean;
 }) {
     const router = useRouter();
     const id = useId();
     const [handle, setHandle] = useState(initialHandle);
-    const [share, setShare] = useState(initialShare);
     const [done, setDone] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -69,23 +69,6 @@ export default function ProfileForm({
                     {pending ? "Saving…" : "Save"}
                 </button>
             </div>
-            <label className="tdx-switch mt-3.5 text-[12.5px]">
-                <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={share}
-                    onChange={(e) => {
-                        setShare(e.target.checked);
-                        setDone(false);
-                    }}
-                />
-                <span className="tdx-switch-knob" aria-hidden />
-                Show what I log in Community
-            </label>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1.5 leading-[1.5]">
-                Only the title and episode number — never notes, never ratings.
-                Off, and nothing you log leaves your dex.
-            </p>
             {error && (
                 <p role="alert" className="text-[11.5px] text-[var(--warning)] mt-2">
                     {error}

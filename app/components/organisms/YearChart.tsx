@@ -11,6 +11,9 @@ export default function YearChart({ summary }: { summary: YearSummary }) {
     const { year, total, months, busiest, quiet, top } = summary;
     const max = Math.max(1, ...months.map((m) => m.episodes));
     const thisMonth = months.find((m) => m.current)?.month ?? 11;
+    // History is only kept from when activity tracking shipped; say so rather
+    // than let earlier months read as "watched nothing".
+    const firstTracked = months.find((m) => m.tracked)?.month;
     const notes = [
         busiest &&
             `Busiest in ${monthLabel(busiest.month)}${busiest.mostly ? `, mostly ${busiest.mostly}` : ""}`,
@@ -100,6 +103,13 @@ export default function YearChart({ summary }: { summary: YearSummary }) {
                     );
                 })}
             </ol>
+
+            {firstTracked !== undefined && firstTracked > 0 && (
+                <p className="mt-[14px] text-[11px] text-[var(--text-muted)]">
+                    Month-by-month history starts in {monthLabel(firstTracked)}.
+                    Earlier logs still count in your totals.
+                </p>
+            )}
 
             {notes.length > 0 && (
                 <div className="flex flex-wrap gap-x-[26px] gap-y-1.5 mt-[18px] text-[11.5px] text-[var(--text-secondary)]">

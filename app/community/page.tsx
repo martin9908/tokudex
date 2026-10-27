@@ -334,14 +334,17 @@ export default async function CommunityHome({
                                     </span>
                                 </div>
                             </div>
-                            {me && !me.share_activity && (
+                            {me && (
                                 <p className="mt-3 text-[11.5px] text-[var(--text-muted)] leading-[1.5]">
-                                    Your activity is hidden from the feed —
-                                    switch it on from{" "}
-                                    <Link href="/account" className="text-[var(--accent-primary)]">
-                                        Account
+                                    {me.share_activity
+                                        ? "Your logs show in the feed. "
+                                        : "Your activity is hidden from the feed. "}
+                                    <Link
+                                        href="/account#sharing"
+                                        className="text-[var(--accent-primary)]"
+                                    >
+                                        {me.share_activity ? "Change" : "Turn on sharing"}
                                     </Link>
-                                    .
                                 </p>
                             )}
                         </>
