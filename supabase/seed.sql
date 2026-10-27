@@ -44,6 +44,24 @@ select
   null
 where not exists (select 1 from public.series where title = 'Ultraman Teo');
 
+insert into public.series (title, franchise, total_episodes, original_run, synopsis)
+select
+  'Kamen Rider My-Th',
+  'Kamen Rider',
+  null,
+  '2026',
+  'Sora Otosumi, a do-everything attendant to the wealthy Mizuki family, becomes a Kamen Rider when the Zyunishi Doumei — twelve zodiac beings who fought the Fukashigi a century ago — and their old enemies reawaken in the modern day.'
+where not exists (select 1 from public.series where title = 'Kamen Rider My-Th');
+
+insert into public.series (title, franchise, total_episodes, original_run, synopsis)
+select
+  'Kakuseihunter Omegahorn',
+  'Project RED',
+  null,
+  '2026',
+  'Treasure hunter Shout awakens Enkaku, the legendary King of the Horned Beasts, and the two team up as Captain Omegahorn to fight rival Horned Beast Hunters in the Hunter Battles.'
+where not exists (select 1 from public.series where title = 'Kakuseihunter Omegahorn');
+
 -- NOTE: Super Space Sheriff Gavan Infinity is seeded via episode upserts below.
 -- The series row must already exist in the database under the title
 -- 'Super Space Sheriff Gavan Infinity'. If your existing row uses a different
@@ -1187,6 +1205,158 @@ do update set title = excluded.title, synopsis = excluded.synopsis, air_date = e
 insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
 select (select id from public.series where title = 'Kishiryu Sentai Ryusoulger'), 48, 'The Will of the Earth', null, '2020-03-01'::date
 where (select id from public.series where title = 'Kishiryu Sentai Ryusoulger') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+commit;
+
+-- Episodes for Kamen Rider My-Th
+-- Generated from data/episodes/my-th.csv — 8 episode(s). Idempotent (upsert).
+
+begin;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 1, 'The Mouse Meister and the Young Lady', null, '2026-09-06'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 2, 'The Running Tortoise and Modern Hare', null, '2026-09-13'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 3, 'The Black Cat Rider of Righteousnyess', null, '2026-09-20'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 4, 'There''s More to a Wolf Than Meets the Eye', null, '2026-09-27'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 5, 'What Snakes or Dogs May Come', null, '2026-10-04'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 6, 'Become an Eagle!', null, '2026-10-11'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 7, 'The Hammer of the Angered Sheep', null, '2026-10-18'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kamen Rider My-Th'), 8, 'A Cornered Rat Will Bite a Cat', null, '2026-10-25'::date
+where (select id from public.series where title = 'Kamen Rider My-Th') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+commit;
+
+-- Episodes for Kakuseihunter Omegahorn
+-- Generated from data/episodes/omegahorn.csv — 15 episode(s). Idempotent (upsert).
+
+begin;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 1, 'Awaken! Red Kakuzyu King!', null, '2026-07-26'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 2, 'Show Me! Captain''s Qualifications!', null, '2026-08-02'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 3, 'Savor It! The Furious Tag Battle!', null, '2026-08-09'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 4, 'Unleash Them! Enkaku vs. Zankaku!', null, '2026-08-16'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 5, 'Find It! Your Own Unique Ego!', null, '2026-08-23'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 6, 'Break Through! The House of Gluttony!', null, '2026-08-30'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 7, 'Break Through! Enkaku vs. Zetsu-Enkaku!', null, '2026-09-06'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 8, 'Revive! Ancient Weapons!', null, '2026-09-13'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 9, 'Shape the Era! Shout vs. Enkaku!', null, '2026-09-20'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 10, 'Ignite Your Fighting Spirit! Captain Ail!', null, '2026-09-27'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 11, 'Shatter! The Wall That Stands in Our Way!', null, '2026-10-04'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 12, 'Take It Back! Giriko vs. Baasaa!', null, '2026-10-11'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 13, 'Come Forth! Visitors From Another World!', null, '2026-10-18'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 14, 'Defend! Hunters vs. Mecha Enkaku!', null, '2026-10-25'::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
+on conflict (series_id, episode_number)
+do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
+
+insert into public.episodes (series_id, episode_number, title, synopsis, air_date)
+select (select id from public.series where title = 'Kakuseihunter Omegahorn'), 15, 'Rise Up! Red Hero!', null, null::date
+where (select id from public.series where title = 'Kakuseihunter Omegahorn') is not null
 on conflict (series_id, episode_number)
 do update set title = excluded.title, synopsis = excluded.synopsis, air_date = excluded.air_date;
 
